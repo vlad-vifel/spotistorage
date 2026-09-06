@@ -1,0 +1,12 @@
+config/
+node_modules/
+.venv/
+__pycache__/
+*.py[cod]
+dist/
+.DS_Store
+*.egg-info/
+.uv/
+frontend/node_modules/
+frontend/dist/
+.claude/

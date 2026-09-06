@@ -1,0 +1,12 @@
+{
+  "name": "spotistorage",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "concurrently --prefix \"[{name}]\" --names \"FRONTEND,BACKEND\" --prefix-colors \"cyan.bold,magenta.bold\" \"npm run dev --prefix frontend\" \"uv run --directory backend uvicorn app.main:app --reload --port 8000\"",
+    "install:all": "npm install && npm install --prefix frontend && uv sync --directory backend"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  }
+}
