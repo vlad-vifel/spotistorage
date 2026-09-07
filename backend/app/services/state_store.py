@@ -1,6 +1,7 @@
 import json
 from pathlib import Path
 from app.core.atomic_write import write_json_atomic
+from app.core.compat import model_dump
 from app.models.source import SpotifyJson, TrackState, TrackStatus
 
 _STATE_FILE = ".spotify.json"
@@ -19,7 +20,7 @@ def load_state(folder: Path) -> SpotifyJson | None:
 
 def save_state(folder: Path, state: SpotifyJson) -> None:
     path = folder / _STATE_FILE
-    payload = state.model_dump()
+    payload = model_dump(state)
     payload["tracks"] = {
         tid: {k: v for k, v in t.items() if v is not None or k in ("file", "status")}
         for tid, t in payload["tracks"].items()
@@ -37,7 +38,6 @@ def sync_file_existence(folder: Path, state: SpotifyJson) -> SpotifyJson:
         if track.file:
             exists = (folder / track.file).exists()
             wanted = TrackStatus.downloaded if exists else TrackStatus.missing
-            # wrong_track is stable while the file exists; if deleted, reset to missing
             _stable = (TrackStatus.removed_from_source,) + ((TrackStatus.wrong_track,) if exists else ())
             if track.status != wanted and track.status not in _stable:
                 track.status = wanted

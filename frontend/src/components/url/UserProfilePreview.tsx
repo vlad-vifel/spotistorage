@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Download, Loader2, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { SourceArtwork } from "@/components/common/SourceArtwork";
 import { MediaCard } from "@/components/common/MediaCard";
 import { useSources } from "@/hooks/useSources";
@@ -22,40 +23,23 @@ function PlaylistCard({ playlist }: { playlist: UserPlaylist }) {
 
   return (
     <MediaCard
-      contentClassName="p-4"
+      contentClassName="md:p-4"
       artworkUrl={playlist.artwork_url}
       artworkName={playlist.name}
-      artworkClassName="shrink-0 w-38 h-38 self-start"
+      artworkClassName="shrink-0 self-start max-md:size-20 max-md:rounded-md max-md:ring-1 max-md:ring-input md:w-38 md:h-38"
       artworkIconClassName="size-9"
-      rightSlot={
-        inLibrary && (
-          <div className="shrink-0 flex items-center px-5">
-            <span className="text-sm font-medium text-emerald-400">Added</span>
-          </div>
-        )
-      }
-    >
-      <div className="min-w-0">
-        <p className="text-xs text-muted-foreground mb-0.5">Playlist</p>
-        <h2 className="text-lg font-semibold truncate">{playlist.name}</h2>
-        {playlist.total_tracks > 0 && (
-          <span className="text-sm text-muted-foreground mt-1 block">
-            {pluralize(playlist.total_tracks, "track")}
-          </span>
-        )}
-      </div>
-      <div className="flex gap-2 mt-3">
-        {inLibrary ? (
-          <Button variant="outline" size="sm" onClick={() => navigate(`/library/${sourceId}`)}>
+      actions={
+        inLibrary ? (
+          <Button variant="outline" size="sm" className="w-full" onClick={() => navigate(`/library/${sourceId}`)}>
             Open in library
           </Button>
         ) : (
-          <>
-            <Button variant="outline" size="sm" onClick={() => handleAdd(playlist.spotify_url)} disabled={isPending}>
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm" className="flex-1" onClick={() => handleAdd(playlist.spotify_url)} disabled={isPending}>
               {pendingAction === "add" && <Loader2 className="size-3.5 animate-spin" />}
               Add to library
             </Button>
-            <Button size="sm" onClick={() => handleAddAndDownload(playlist.spotify_url)} disabled={isPending}>
+            <Button size="sm" className="flex-1" onClick={() => handleAddAndDownload(playlist.spotify_url)} disabled={isPending}>
               {pendingAction === "addAndDownload" ? (
                 <Loader2 className="size-3.5 animate-spin" />
               ) : (
@@ -63,7 +47,24 @@ function PlaylistCard({ playlist }: { playlist: UserPlaylist }) {
               )}
               Add &amp; Download
             </Button>
-          </>
+          </div>
+        )
+      }
+    >
+      <div className="min-w-0">
+        <p className="text-xs text-muted-foreground mb-0.5">Playlist</p>
+        <h2 className="text-lg font-semibold truncate">
+          {playlist.name}
+          {playlist.total_tracks > 0 && (
+            <span className="text-sm font-normal text-muted-foreground">
+              {" "}({pluralize(playlist.total_tracks, "track")})
+            </span>
+          )}
+        </h2>
+        {inLibrary && (
+          <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+            <Badge variant="success">Added</Badge>
+          </div>
         )}
       </div>
     </MediaCard>

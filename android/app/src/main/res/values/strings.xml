@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">SpotiStorage</string>
+    <string name="notification_channel_name">Downloads</string>
+    <string name="notification_idle">SpotiStorage is running</string>
+</resources>

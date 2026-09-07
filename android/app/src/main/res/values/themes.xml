@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <!-- Dark-only, matching the web app's zinc palette (frontend/src/index.css)
+         closely enough for the status bar / splash background to not flash white
+         while the embedded Python server is starting up. -->
+    <style name="Theme.SpotiStorage" parent="Theme.AppCompat.NoActionBar">
+        <item name="android:windowBackground">@color/zinc_950</item>
+        <item name="android:statusBarColor">@color/zinc_950</item>
+        <item name="android:navigationBarColor">@color/zinc_950</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowLightNavigationBar" tools:targetApi="o_mr1">false</item>
+    </style>
+</resources>

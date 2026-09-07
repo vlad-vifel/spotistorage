@@ -5,9 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>SpotiStorage</title>
     <link rel="icon" href="/favicon.svg" />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <style>
+      /* Hardcoded hex, not tokens: this runs before index.css loads, to
+         avoid a flash of unstyled content. Keep in sync with the
+         --background/--foreground values in src/index.css. */
       html, body, #root {
         margin: 0;
         padding: 0;

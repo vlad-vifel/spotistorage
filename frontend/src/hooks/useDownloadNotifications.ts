@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
+import { useNavigate } from "react-router-dom";
 import { useDownloads } from "./useDownloads";
 
 export type LastBatch = { done: number; failed: number } | null;
@@ -10,6 +11,7 @@ export function useDownloadNotifications() {
   const wasActiveRef = useRef(false);
   const [lastBatch, setLastBatch] = useState<LastBatch>(null);
   const qc = useQueryClient();
+  const navigate = useNavigate();
 
   useEffect(() => {
     const isActive = active.length > 0;
@@ -26,11 +28,17 @@ export function useDownloadNotifications() {
 
       if (doneCount > 0 || failedCount > 0) {
         setLastBatch({ done: doneCount, failed: failedCount });
+
         if (failedCount === 0) {
-          toast.success(`Downloaded ${doneCount} track${doneCount === 1 ? "" : "s"}`);
+          const sourceIds = new Set(done.map((j) => j.source_id));
+          const target = sourceIds.size === 1 ? `/library/${[...sourceIds][0]}` : "/library";
+          toast.success(`Downloaded ${doneCount} track${doneCount === 1 ? "" : "s"}`, {
+            action: { label: "Open", onClick: () => navigate(target) },
+          });
         } else {
           toast.warning(
-            `Downloaded ${doneCount} track${doneCount === 1 ? "" : "s"} · ${failedCount} failed`
+            `Downloaded ${doneCount} track${doneCount === 1 ? "" : "s"} · ${failedCount} failed`,
+            { action: { label: "View", onClick: () => navigate("/errors") } }
           );
         }
       }

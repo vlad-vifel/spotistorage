@@ -82,6 +82,9 @@ export function AddPage() {
           )}
         </Button>
       </form>
+      {invalidUrl && (
+        <p className="md:hidden text-xs text-amber-400 mt-1.5">Doesn't look like a Spotify URL</p>
+      )}
 
       {resolve.data && (
         resolve.data.type === "user" ? (

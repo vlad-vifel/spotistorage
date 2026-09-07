@@ -1,7 +1,7 @@
 import aiosqlite
-from pathlib import Path
+from app.core.paths import config_dir
 
-_DB_PATH = Path(__file__).parents[3] / "config" / "jobs.db"
+_DB_PATH = config_dir() / "jobs.db"
 _db: aiosqlite.Connection | None = None
 
 
@@ -27,7 +27,6 @@ async def init_db() -> None:
             retry_count INTEGER DEFAULT 0
         )
     """)
-    # Add retry_count to existing DBs that were created before this column existed
     try:
         await _db.execute("ALTER TABLE download_jobs ADD COLUMN retry_count INTEGER DEFAULT 0")
     except Exception:

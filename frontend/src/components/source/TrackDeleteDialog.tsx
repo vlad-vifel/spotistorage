@@ -15,7 +15,7 @@ interface Props {
 export function TrackDeleteDialog({ trackTitle, open, onOpenChange, onConfirm, isPending }: Props) {
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
-      <AlertDialogContent className="max-w-lg">
+      <AlertDialogContent className="md:max-w-lg">
         <AlertDialogHeader>
           <AlertDialogTitle>Delete "{trackTitle}"?</AlertDialogTitle>
           <AlertDialogDescription>

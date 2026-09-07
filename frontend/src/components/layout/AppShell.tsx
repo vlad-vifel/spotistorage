@@ -8,8 +8,10 @@ import {
 } from "@/components/ui/breadcrumb";
 import { AppSidebar } from "./AppSidebar";
 import { DownloadBar } from "./DownloadBar";
+import { BottomNav } from "./BottomNav";
 import { useDownloadNotifications } from "@/hooks/useDownloadNotifications";
 import { useSource } from "@/hooks/useSources";
+import { useIsMobile } from "@/hooks/useIsMobile";
 
 const STATIC_TITLES: Record<string, string> = {
   "/library": "Library",
@@ -30,17 +32,17 @@ function AppBreadcrumbs() {
       { label: source?.name ?? "..." },
     ];
     return (
-      <Breadcrumb>
-        <BreadcrumbList>
+      <Breadcrumb className="min-w-0">
+        <BreadcrumbList className="min-w-0 flex-nowrap">
           {crumbs.map((crumb, i) => (
             <Fragment key={i}>
-              <BreadcrumbItem>
+              <BreadcrumbItem className={i === crumbs.length - 1 ? "min-w-0" : undefined}>
                 {i < crumbs.length - 1 ? (
                   <BreadcrumbLink asChild>
                     <Link to={crumb.href!}>{crumb.label}</Link>
                   </BreadcrumbLink>
                 ) : (
-                  <BreadcrumbPage>{crumb.label}</BreadcrumbPage>
+                  <BreadcrumbPage className="truncate">{crumb.label}</BreadcrumbPage>
                 )}
               </BreadcrumbItem>
               {i < crumbs.length - 1 && <BreadcrumbSeparator />}
@@ -57,16 +59,17 @@ function AppBreadcrumbs() {
 
 export function AppShell() {
   const { lastBatch, clearLastBatch } = useDownloadNotifications();
+  const isMobile = useIsMobile();
 
   return (
     <SidebarProvider className="h-svh! min-h-0! overflow-hidden" style={{ "--sidebar-width": "188px" } as CSSProperties}>
       <AppSidebar />
       <SidebarInset className="flex flex-col min-h-0 overflow-hidden">
-        <header className="flex h-12 shrink-0 items-center gap-2 px-4 border-b border-border/50">
-          <SidebarTrigger className="-ml-1" />
+        <header className="max-md:hidden flex h-12 shrink-0 items-center gap-2 px-4 border-b border-border/50">
+          {!isMobile && <SidebarTrigger className="-ml-1" />}
           <AppBreadcrumbs />
           {lastBatch && (
-            <div className="ml-auto flex items-center gap-1.5 rounded-full border border-border/50 bg-muted/50 px-2.5 py-1 text-xs">
+            <div className="ml-auto flex items-center gap-1.5 rounded-full border border-border/50 bg-muted/50 px-2.5 py-1 text-xs shrink-0">
               {lastBatch.failed > 0 ? (
                 <AlertCircle className="size-3 text-amber-400 shrink-0" />
               ) : (
@@ -87,12 +90,16 @@ export function AppShell() {
             </div>
           )}
         </header>
-        <div className="flex-1 min-h-0 overflow-y-auto [scrollbar-gutter:stable]">
-          <div className="px-6">
+        <div
+          data-scroll-root
+          className="flex-1 min-h-0 overflow-y-auto max-md:overflow-x-hidden md:[scrollbar-gutter:stable]"
+        >
+          <div className="px-4 sm:px-6">
             <Outlet />
           </div>
         </div>
         <DownloadBar />
+        {isMobile && <BottomNav />}
       </SidebarInset>
     </SidebarProvider>
   );

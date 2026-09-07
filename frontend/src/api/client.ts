@@ -1,3 +1,5 @@
+import { isAndroid, getApiToken } from "@/lib/androidBridge";
+
 const BASE = "/api";
 
 export class ApiError extends Error {
@@ -12,7 +14,7 @@ export class ApiError extends Error {
 export function getErrorMessage(err: unknown): string {
   if (err instanceof ApiError) return err.message;
   if (err instanceof TypeError && err.message.includes("fetch")) {
-    return "Cannot reach the backend – is it running on :8000?";
+    return "Cannot reach the backend – try restarting the app.";
   }
   if (err instanceof Error) return err.message;
   return String(err);
@@ -31,10 +33,16 @@ async function parseError(res: Response): Promise<string> {
   }
 }
 
+function authHeaders(): Record<string, string> {
+  if (!isAndroid()) return {};
+  const token = getApiToken();
+  return token ? { "X-SpotiStorage-Token": token } : {};
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${BASE}${path}`, {
     ...init,
-    headers: { "Content-Type": "application/json", ...init?.headers },
+    headers: { "Content-Type": "application/json", ...authHeaders(), ...init?.headers },
   });
   if (!res.ok) {
     const msg = await parseError(res);

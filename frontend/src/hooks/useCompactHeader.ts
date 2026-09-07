@@ -7,7 +7,7 @@ export function useCompactHeader() {
   useEffect(() => {
     const el = headerRef.current;
     if (!el) return;
-    const scrollRoot = el.closest<HTMLElement>(".overflow-y-auto") ?? null;
+    const scrollRoot = el.closest<HTMLElement>("[data-scroll-root], .overflow-y-auto") ?? null;
     const obs = new IntersectionObserver(
       ([entry]) => setCompact(!entry.isIntersecting),
       { root: scrollRoot, threshold: 0 }

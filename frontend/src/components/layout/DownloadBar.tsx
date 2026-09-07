@@ -1,11 +1,14 @@
 import { useState } from "react";
 import { ChevronUp, ChevronDown, AlertCircle, Loader2 } from "lucide-react";
 import { useDownloads } from "@/hooks/useDownloads";
+import { useIsMobile } from "@/hooks/useIsMobile";
 import { DownloadPanel } from "./DownloadPanel";
 import { Progress } from "@/components/ui/progress";
+import { Sheet, SheetContent } from "@/components/ui/sheet";
 
 export function DownloadBar() {
   const { active, failed, done } = useDownloads();
+  const isMobile = useIsMobile();
   const [expanded, setExpanded] = useState(false);
 
   const visible = active.length > 0 || failed.length > 0;
@@ -16,14 +19,14 @@ export function DownloadBar() {
 
   return (
     <div className="border-t border-border/50">
-      {expanded && <DownloadPanel onClose={() => setExpanded(false)} />}
+      {!isMobile && expanded && <DownloadPanel onClose={() => setExpanded(false)} />}
       <button
         className="w-full hover:bg-muted/40 transition-colors"
         onClick={() => setExpanded((v) => !v)}
         aria-label={expanded ? "Collapse download queue" : "Expand download queue"}
         aria-expanded={expanded}
       >
-        <div className="flex items-center gap-3 px-6 py-2">
+        <div className="flex items-center gap-3 px-4 py-1.5 md:px-6 md:py-2">
           {active.length > 0 && (
             <Loader2 className="size-3.5 animate-spin text-muted-foreground shrink-0" />
           )}
@@ -44,6 +47,14 @@ export function DownloadBar() {
           </div>
         </div>
       </button>
+
+      {isMobile && (
+        <Sheet open={expanded} onOpenChange={setExpanded}>
+          <SheetContent side="bottom" className="h-[70svh] p-0 overflow-hidden [&>button]:hidden">
+            <DownloadPanel onClose={() => setExpanded(false)} />
+          </SheetContent>
+        </Sheet>
+      )}
     </div>
   );
 }

@@ -4,6 +4,8 @@ import { TrackActionButton } from "./TrackActionButton";
 import { TrackDeleteDialog } from "./TrackDeleteDialog";
 import { useRetryDownload } from "@/hooks/useDownloads";
 import { useDownloadSingleTrack, useDeleteTrack } from "@/hooks/useSources";
+import { cn } from "@/lib/utils";
+import { TRACK_ROW, COL_POSITION, COL_TITLE, COL_STATUS, COL_ACTION } from "./trackColumns";
 import type { TrackInfo, TrackStatus, DownloadJob } from "@/api/types";
 
 interface Props {
@@ -19,29 +21,30 @@ export const TrackRow = memo(function TrackRow({ track, position, sourceId, job 
   const downloadTrack = useDownloadSingleTrack();
   const deleteTrack = useDeleteTrack();
 
-  const effectiveStatus: TrackStatus =
-    job?.status === "done" ? "downloaded"
-    : job ? (job.status as TrackStatus)
-    : track.status;
+  const isJobLive = job?.status === "queued" || job?.status === "downloading" || job?.status === "failed";
+  const effectiveStatus: TrackStatus = isJobLive ? (job!.status as TrackStatus) : track.status;
 
   const isRemoved = effectiveStatus === "removed_from_source";
 
   return (
     <>
-      <div className="group h-14 flex items-center gap-4 px-4 border border-transparent hover:bg-muted/40 hover:border-border rounded transition-colors">
-        <span className="text-muted-foreground text-xs w-8 text-center shrink-0 tabular-nums cursor-default">
+      <div className={cn(TRACK_ROW, "group h-14 border border-transparent hover:bg-muted/40 hover:border-border rounded transition-colors")}>
+        <span className={cn(COL_POSITION, "text-muted-foreground text-xs tabular-nums cursor-default")}>
           {isRemoved ? "*" : position}
         </span>
-        <div className="flex-1 min-w-0 cursor-default">
-          <p className="text-sm text-foreground truncate">{track.title ?? track.file ?? track.id}</p>
+        <div className={cn(COL_TITLE, "cursor-default")}>
+          <p className="text-sm text-foreground truncate">
+            {isRemoved && <span className="md:hidden">* </span>}
+            {track.title ?? track.file ?? track.id}
+          </p>
           {track.artist && (
             <p className="text-xs text-muted-foreground truncate">{track.artist}</p>
           )}
         </div>
-        <div className="flex items-center justify-center w-16 shrink-0">
+        <div className={COL_STATUS}>
           <TrackStatusBadge status={effectiveStatus} job={job} />
         </div>
-        <div className="flex items-center justify-center w-8 shrink-0">
+        <div className={COL_ACTION}>
           <TrackActionButton
             status={effectiveStatus}
             job={job}

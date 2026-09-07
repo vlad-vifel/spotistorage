@@ -99,14 +99,18 @@ export interface AppConfig {
   setup_complete: boolean;
   sp_dc?: string | null;
   youtube_cookies_path?: string | null;
+  youtube_cookies_content?: string | null;
   youtube_browser?: string | null;
   deezer_arl?: string | null;
+  platform?: string;
 }
 
 export interface DepsStatus {
   ffmpeg: boolean;
+  ffprobe: boolean;
   yt_dlp: boolean;
   pycryptodome: boolean;
+  js_runtime: boolean;
   all_ok: boolean;
 }
 

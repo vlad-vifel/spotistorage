@@ -23,43 +23,27 @@ export function ResolvePreview({ result, onAdd, onAddAndDownload, pendingAction 
   return (
     <MediaCard
       className="mt-6"
-      contentClassName="p-5"
+      contentClassName="md:p-5"
       artworkUrl={result.artwork_url}
       artworkName={result.name}
-      artworkClassName="h-auto aspect-square object-cover shrink-0 self-stretch min-w-28"
+      artworkClassName="object-cover shrink-0 max-md:size-20 max-md:rounded-md max-md:ring-1 max-md:ring-input md:size-36"
       artworkIconClassName="size-9"
-      artworkStyle={{ maxWidth: "10rem" }}
-    >
-      <div className="min-w-0">
-        <p className="text-xs text-muted-foreground mb-0.5">{typeLabel}</p>
-        <h2 className="text-lg font-semibold truncate">{result.name}</h2>
-        <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-          <span className="text-sm text-muted-foreground">
-            {pluralize(result.total_tracks, "track")}
-          </span>
-          {result.already_in_library && (
-            <Badge variant="info">Already in library</Badge>
-          )}
-          {result.already_in_library && result.downloaded_tracks > 0 && (
-            <Badge variant="success">{result.downloaded_tracks} downloaded</Badge>
-          )}
-        </div>
-      </div>
-      <div className="flex gap-2 mt-3">
-        {result.already_in_library ? (
+      actions={
+        result.already_in_library ? (
           <Button
             variant="outline"
             size="sm"
+            className="w-full"
             onClick={() => navigate(libraryPath)}
           >
             Open in library
           </Button>
         ) : (
-          <>
-            <Button variant="outline" size="sm" onClick={onAdd} disabled={isPending}>
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm" className="flex-1" onClick={onAdd} disabled={isPending}>
               Add to library
             </Button>
-            <Button size="sm" onClick={onAddAndDownload} disabled={isPending}>
+            <Button size="sm" className="flex-1" onClick={onAddAndDownload} disabled={isPending}>
               {pendingAction === "addAndDownload" ? (
                 <Loader2 className="size-3.5 animate-spin" />
               ) : (
@@ -67,7 +51,22 @@ export function ResolvePreview({ result, onAdd, onAddAndDownload, pendingAction 
               )}
               Add &amp; Download
             </Button>
-          </>
+          </div>
+        )
+      }
+    >
+      <div className="min-w-0">
+        <p className="text-xs text-muted-foreground mb-0.5">{typeLabel}</p>
+        <h2 className="text-lg font-semibold truncate">
+          {result.name}{" "}
+          <span className="text-sm font-normal text-muted-foreground">
+            ({pluralize(result.total_tracks, "track")})
+          </span>
+        </h2>
+        {result.already_in_library && (
+          <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+            <Badge variant="info">Already in library</Badge>
+          </div>
         )}
       </div>
     </MediaCard>

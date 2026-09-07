@@ -16,7 +16,8 @@ Local-only web app: paste Spotify URL (playlist/album/track/user profile) → de
 - **Download engine:** SpotifyScraper (Spotify metadata/search). Audio comes from Deezer's private API (`services/deezer.py`, requires a user-supplied `arl` cookie) tried first, then yt-dlp/YouTube search (`services/yt_download.py`) as fallback. Candidate ranking lives in `services/matching.py`. Do NOT reimplement this search/matching logic.
 - **Metadata:** Mutagen (MP3/ID3 tags)
 - **Download queue:** SQLite via aiosqlite — ephemeral job state only, NOT library state (library state lives in `.spotify.json` files)
-- **External deps:** FFmpeg (must be in PATH), Node.js 22+ (yt-dlp's JS runtime for YouTube's player challenge). All Python packages including yt-dlp are managed by uv. Detect missing deps at startup (`services/deps_check.py`, `GET /api/dependencies`), never silently install.
+- **External deps:** FFmpeg (must be in PATH on desktop), a JS runtime for YouTube's player challenge (QuickJS-NG, bundled in `backend/bin/` on desktop). All Python packages including yt-dlp are managed by uv. Detect missing deps at startup (`services/deps_check.py`, `GET /api/dependencies`), never silently install.
+- **Android (optional):** a thin Kotlin WebView wrapper (`android/`) around the *same* FastAPI backend, run in-process via Chaquopy's embedded CPython. See "Android App" below — it's a packaging concern only, not a second implementation.
 
 ## Non-Goals
 
@@ -40,12 +41,17 @@ Single command: `npm run dev` starts both frontend (:5173) and backend (:8000) v
 spotistorage/
 ├── frontend/          # React app (src/pages, components/, hooks/, lib/, api/)
 ├── backend/           # FastAPI app
-│   └── app/
-│       ├── main.py      # App setup, CORS, router registration, startup deps check
-│       ├── api/          # Route handlers (config, libraries, sources, downloads, dependencies)
-│       ├── services/     # Business logic — see below
-│       ├── models/       # Pydantic models (config, source/track state, download job)
-│       └── core/         # paths.py (safe path resolution), atomic_write.py, state_locks.py
+│   ├── app/
+│   │   ├── main.py      # App setup, CORS, token-auth middleware, router registration, startup deps check
+│   │   ├── server.py     # uvicorn entrypoint (used by both `npm run dev` and the Android launcher)
+│   │   ├── api/          # Route handlers (config, libraries, sources, downloads, dependencies)
+│   │   ├── services/     # Business logic — see below
+│   │   ├── models/       # Pydantic models (config, source/track state, download job)
+│   │   └── core/         # paths.py (safe path resolution + platform-specific config/ffmpeg/quickjs
+│   │                     # resolution), atomic_write.py, state_locks.py, compat.py (pydantic v1/v2
+│   │                     # shim — Android's Chaquopy runs pydantic v1, no Rust wheel available there)
+│   └── bin/qjs.exe      # Bundled QuickJS-NG binary (desktop only — Android bundles its own in jniLibs)
+├── android/           # Optional Kotlin WebView wrapper — see "Android App" below
 ├── config/user.json   # User config incl. secrets (git-ignored)
 ├── config/jobs.db      # Ephemeral download queue (git-ignored, cleared on restart)
 ├── package.json       # Root: concurrently runs both
@@ -103,11 +109,23 @@ Embed into MP3 via Mutagen: title, artist, album, album artist, track/disc numbe
 
 Stored in `config/user.json` (git-ignored), editable only via UI. Supports multiple independent libraries (each with own root dir, playlists, albums, state). First launch: setup wizard (pick music folder, format=MP3).
 
-Also holds optional download-source credentials: `sp_dc` (Spotify session cookie, only needed to resolve user-profile URLs), `deezer_arl` (Deezer session cookie, enables Deezer as a download source), and `youtube_cookies_path`/`youtube_browser` (yt-dlp cookie source, for age-restricted videos). `GET /api/config` returns these masked (`config_store.mask_secrets`); the dedicated `PUT /api/config/{sp-dc,deezer-arl,youtube-cookies}` endpoints take the real value.
+Also holds optional download-source credentials: `sp_dc` (Spotify session cookie, only needed to resolve user-profile URLs), `deezer_arl` (Deezer session cookie, enables Deezer as a download source), and `youtube_cookies_path`/`youtube_browser` (yt-dlp cookie source, for age-restricted videos; a pasted-cookies-text variant writes to `config/youtube_cookies.txt` instead). `GET /api/config` returns these **unmasked** — this is a single-user local app, not a multi-tenant service, and the UI needs the real value to display/copy it — via the dedicated `PUT /api/config/{sp-dc,deezer-arl,youtube-cookies}` endpoints.
 
 ## Library Recovery
 
 If app is reinstalled, pointing at same library dir recovers state from `.spotify.json` files and existing MP3s.
+
+## Android App
+
+`android/` wraps the *unmodified* `backend/app` in a Kotlin WebView shell — there is no second backend implementation, and no code under `backend/app/` should ever check `if platform == "android"` for business logic, only for environment/dependency resolution (paths, ffmpeg, JS runtime).
+
+- **Runtime:** Chaquopy embeds CPython in the APK (`PythonServerManager.kt` starts it and calls `app.server.run()`, the same `uvicorn` entrypoint desktop uses). `MainActivity`'s WebView loads `http://127.0.0.1:8000` once `/api/health` answers; `ServerForegroundService` keeps the process (and any in-flight download) alive while backgrounded, mirroring a poll of `/api/downloads` into a system notification.
+- **Platform detection is purely env vars**, set once in `PythonServerManager.start()`: `SPOTISTORAGE_CONFIG_DIR` (app's private files dir, replaces the desktop `config/` folder), `SPOTISTORAGE_PLATFORM=android`, `SPOTISTORAGE_PORT`, `SPOTISTORAGE_FFMPEG_DIR`/`SPOTISTORAGE_QUICKJS_PATH` (point at the `.so` binaries bundled in `jniLibs/arm64-v8a`, extracted there because API 29+'s W^X policy only allows executing a bundled binary from `nativeLibraryDir`), `SPOTISTORAGE_API_TOKEN` (below). `backend/app/core/paths.py` is where all of these get resolved.
+- **Dependency pin:** Android runs **pydantic v1** (no Android wheel exists for pydantic-core/v2's Rust extension) — `backend/app/core/compat.py` is the only place the two APIs diverge (`model_dump`/`model_validate`/`model_copy` shims). `android/app/build.gradle.kts`'s `chaquopy { pip { ... } }` block mirrors `backend/pyproject.toml` by hand; keep them in sync.
+- **Frontend delivery:** the Android build runs `npm run build --prefix frontend` first, then Chaquopy merges `frontend/dist` as a second `srcDir` alongside `app/` (see `build.gradle.kts`). `backend/app/main.py`'s `_find_frontend_dist()` tries both the desktop layout (`frontend/dist` as a sibling of `backend/`) and this merged Android layout so the same file works on both platforms.
+- **Loopback auth:** unlike desktop (single OS user, no other app can reach `127.0.0.1:8000`), Android's loopback port is reachable by any other app on the device. `SPOTISTORAGE_API_TOKEN` (a random value generated once per launch by `PythonServerManager`) is required via an `X-SpotiStorage-Token` header on every `/api/*` request except `/api/health`, enforced by `main.py`'s `_TokenAuthMiddleware` — a no-op on desktop, since the env var is never set there. The WebView gets the token synchronously via `AndroidBridge.getApiToken()`; `frontend/src/api/client.ts` attaches it automatically when `isAndroid()`.
+- **Storage:** `MANAGE_EXTERNAL_STORAGE` (granted via a Settings redirect in `StepPermissions`/`NotificationPermissionSetting`, not a runtime dialog) is what lets downloaded MP3s land as plain, visible files rather than sandboxed app storage — required by this project's Core Principle. The folder picker (`SafPathResolver.kt`) is only ever used to translate a `content://` tree URI into that real path; it isn't a separate access grant.
+- **Distribution:** pre-built APKs are published as GitHub Releases — most contributors never need to build the Android app themselves. Building it locally needs Android Studio + the same `backend/.venv` the desktop backend uses (`chaquopy.buildPython` points at it directly) — see the README.
 
 ## UI Design
 
@@ -119,9 +137,9 @@ Dark-only. Zinc oklch palette via CSS tokens in `frontend/src/index.css` (`@them
 
 Elevation: `ring-1 ring-foreground/10` instead of drop shadows. Hover language: `transition-colors hover:bg-muted/40`. Card recipe: `rounded-lg border border-border/50 bg-card`. Empty state recipe: `rounded-xl border border-border/50 bg-card p-12` with centred icon, title, subtitle.
 
-Shell: 188px inset sidebar (`AppSidebar`) + `SidebarInset` flex column. `DownloadBar` is a flow child at the bottom of the inset column — not `fixed`. `Cmd/Ctrl+B` toggles sidebar; state persists via cookie.
+Shell: 188px inset sidebar (`AppSidebar`) + `SidebarInset` flex column. `DownloadBar` is a flow child at the bottom of the inset column — not `fixed`. `Cmd/Ctrl+B` toggles sidebar; state persists via cookie. Below the `md` breakpoint, `AppSidebar` and the breadcrumb header hide in favor of `BottomNav` (same `navItems.ts` list) and per-page titles; `useIsMobile()` is the single source of truth for layout branches that need JS (not just CSS) — e.g. swapping a `DropdownMenu` for a `Sheet`, or picking which of two DOM positions an action slot renders into (never both, to avoid mounting a component's hooks twice).
 
-Main nav: Library, Add (paste URL), Errors, Settings. Library switcher lives in the sidebar footer `DropdownMenu`.
+Main nav: Library, Add (paste URL), Errors, Settings. Library switcher lives in Settings → "Music libraries" (click a library to make it active).
 
 Key views: source page (track list with status badges, refresh + download, external link to the source on Spotify), errors page (failed downloads across the library, retry/retry-with-url/clear), settings (library management, system dependencies, download-source credentials), add page (URL input with soft validation, resolve preview; also handles Spotify user-profile URLs by listing public playlists).
 
@@ -131,17 +149,18 @@ Always reach for an existing `components/ui/` primitive (or add one via shadcn c
 
 - **Max size: 200 lines per component file, target ~100 lines.** If a component grows beyond that, extract logic into a hook in `hooks/` or split markup into a child component in the same folder.
 - **No `.tsx` files in `src/` root** except `main.tsx` and `App.tsx`. All components live in semantic subfolders:
-  - `components/layout/` — AppShell, AppSidebar, DownloadBar, DownloadPanel
+  - `components/layout/` — AppShell, AppSidebar, BottomNav (mobile-only nav, same `navItems.ts` as the sidebar), NavErrorBadge, DownloadBar, DownloadPanel
   - `components/url/` — ResolvePreview, UserProfilePreview
   - `components/library/` — SourceList, SourceCard
-  - `components/source/` — SourceHeader, CompactBar, SourceActions, TrackTable, TrackRow, TrackStatusBadge, RefreshBanner, DeleteSourceDialog, TrackDeleteDialog
-  - `components/settings/` — LibraryPathSetting, DeleteLibraryDialog, SpotifyCookieSetting, DeezerArlSetting, YoutubeCookiesSetting, SecretCookieSetting (shared by the two cookie settings), DependencyStatus
-  - `components/setup/` — SetupWizard, StepFolder, StepDeps
-  - `components/common/` — small cross-page building blocks: SourceArtwork, MediaCard (shared artwork+content card layout), EmptyState, SearchInput, CenteredSpinner, CircularProgress
+  - `components/source/` — SourceHeader, CompactBar, SourceActions, TrackTable, TrackTableHeader, TrackRow, TrackStatusBadge, RefreshBanner, DeleteSourceDialog, TrackDeleteDialog, `trackColumns.ts` (shared column-width classes between the header and rows)
+  - `components/errors/` — ErrorRow
+  - `components/settings/` — LibraryPathSetting, DeleteLibraryDialog, SpotifyCookieSetting, DeezerArlSetting, YoutubeCookiesSetting (+ its three mode components: `YoutubeCookiesBrowserMode`/`FileMode`/`PasteMode`), SecretCookieSetting (shared by the two cookie settings), DependencyStatus, NotificationPermissionSetting (Android only)
+  - `components/setup/` — SetupWizard, StepWelcome, StepPermissions (Android only), StepFolder, StepDeps
+  - `components/common/` — small cross-page building blocks: SourceArtwork, MediaCard (shared artwork+content card layout — pick ONE render position for an `actions` slot via `useIsMobile()`, never render it twice), EmptyState, SearchInput, CenteredSpinner, CircularProgress, ActionMenu (DropdownMenu on desktop / Sheet on mobile, same items list), CopyButton, PermissionStatus (Android only)
   - `components/ui/` — shadcn/ui primitives (generated output, do not hand-edit these unless adding a variant)
   - `pages/` — thin page shells (LibraryPage, SourcePage, SettingsPage, SetupPage, AddPage, ErrorsPage)
-  - `hooks/` — all custom hooks; split by concern once a hook file grows (e.g. `useSourceQueries`/`useSourceMutations`, re-exported together from `useSources` so call sites don't churn), plus flow-specific hooks like `useDeleteSourceFlow`, `useAddAndDownload`, `useTrackSortFilter`
-  - `lib/` — pure utilities: `utils.ts` (`cn`, `capitalize`, `pluralize`, `formatLocalTime`), `status.ts` (badge-variant + missing-track-count helpers), `toast.ts` (sonner wrappers)
+  - `hooks/` — all custom hooks; split by concern once a hook file grows (e.g. `useSourceQueries`/`useSourceMutations`, re-exported together from `useSources` so call sites don't churn), plus flow-specific hooks like `useDeleteSourceFlow`, `useAddAndDownload`, `useTrackSortFilter`, `useSetupSteps` (which steps apply — `permissions` only on Android), `useCopyToClipboard`
+  - `lib/` — pure utilities: `utils.ts` (`cn`, `capitalize`, `pluralize`, `formatLocalTime`), `status.ts` (badge-variant + missing-track-count helpers), `toast.ts` (sonner wrappers), `androidBridge.ts` (typed wrapper over `window.AndroidBridge`, a no-op everywhere except inside the Android WebView — see "Android App" below)
 
 ## Filesystem Safety
 
@@ -154,9 +173,9 @@ Support 300+ track playlists as normal case. No hard-coded limits. Use paginatio
 ## API (approximate)
 
 ```
-GET/PUT  /api/config (secrets masked on GET)
-PUT      /api/config/sp-dc, /api/config/youtube-cookies, /api/config/deezer-arl
-GET      /api/config/browse-folder, /api/config/browse-file
+GET/PUT  /api/config
+PUT      /api/config/complete-setup, /api/config/sp-dc, /api/config/youtube-cookies, /api/config/deezer-arl
+GET      /api/config/browse-folder, /api/config/browse-file (desktop only — 400 on Android)
 GET/POST /api/libraries, DELETE /api/libraries/{id}
 POST     /api/sources/resolve, POST /api/sources
 GET      /api/sources, /api/sources/{id}

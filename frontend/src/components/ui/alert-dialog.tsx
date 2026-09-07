@@ -46,7 +46,9 @@ function AlertDialogContent({
           action?.focus();
         }}
         className={cn(
-          "fixed left-1/2 top-1/2 z-50 grid w-full max-w-md -translate-x-1/2 -translate-y-1/2 gap-4 bg-popover p-6 ring-1 ring-foreground/10 rounded-xl data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95",
+          "fixed z-50 grid w-full gap-4 bg-popover p-6 ring-1 ring-foreground/10 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
+          "max-md:inset-x-0 max-md:bottom-0 max-md:rounded-t-xl max-md:data-[state=open]:slide-in-from-bottom max-md:data-[state=closed]:slide-out-to-bottom",
+          "md:left-1/2 md:top-1/2 md:w-[calc(100%-2rem)] md:max-w-md md:-translate-x-1/2 md:-translate-y-1/2 md:rounded-xl md:data-[state=closed]:zoom-out-95 md:data-[state=open]:zoom-in-95",
           className
         )}
         {...props}
@@ -60,7 +62,15 @@ function AlertDialogHeader({ className, ...props }: React.HTMLAttributes<HTMLDiv
 }
 
 function AlertDialogFooter({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
-  return <div className={cn("flex flex-col-reverse gap-2 sm:flex-row sm:justify-end", className)} {...props} />;
+  return (
+    <div
+      className={cn(
+        "flex flex-col-reverse gap-2 sm:flex-row sm:justify-end max-md:[&>*]:h-11 max-md:[&>*]:w-full",
+        className
+      )}
+      {...props}
+    />
+  );
 }
 
 function AlertDialogTitle({ className, ...props }: React.ComponentProps<typeof AlertDialogPrimitive.Title>) {

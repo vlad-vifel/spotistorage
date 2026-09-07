@@ -2,6 +2,7 @@ import asyncio
 import uuid
 from pathlib import Path
 from typing import Callable
+from app.core.paths import ffmpeg_location_env, resolve_quickjs_path
 
 _DURATION_THRESHOLD = 10.0
 _YOUTUBE_HOSTS = ("youtube.com", "youtu.be")
@@ -23,27 +24,8 @@ def _combined_error(deezer_error: str | None, youtube_error: str | None, default
         parts.append(f"YouTube: {youtube_error}")
     if not parts:
         return RuntimeError(default)
-    # each part ends with a period so the split is visible even when collapsed onto one line
     parts = [p if p.endswith((".", "!", "?")) else f"{p}." for p in parts]
     return RuntimeError("\n".join(parts))
-
-
-def _find_node_path() -> str:
-    import sys
-    nvm_dir = Path.home() / "AppData" / "Roaming" / "nvm"
-    if nvm_dir.exists():
-        candidates = sorted(
-            [d for d in nvm_dir.iterdir() if d.name.startswith("v")],
-            key=lambda d: tuple(int(x) for x in d.name[1:].split(".")[:3]),
-            reverse=True,
-        )
-        for c in candidates:
-            major = int(c.name[1:].split(".")[0])
-            if major >= 22:
-                exe = c / ("node.exe" if sys.platform == "win32" else "bin/node")
-                if exe.exists():
-                    return str(exe)
-    return "node"
 
 
 def _is_youtube_url(url: str) -> bool:
@@ -56,7 +38,6 @@ def _is_deezer_url(url: str) -> bool:
 
 def _base_ydl_opts(
     outtmpl: str,
-    node_path: str,
     *,
     use_cookies: bool,
     youtube_cookies_path: str | None,
@@ -70,8 +51,7 @@ def _base_ydl_opts(
             "preferredcodec": "mp3",
             "preferredquality": "192",
         }],
-        "js_runtimes": {"node": {"path": node_path}},
-        "remote_components": ["ejs:github"],
+        "js_runtimes": {"quickjs": {"path": resolve_quickjs_path()}},
         "extractor_args": {"youtube": {"player_client": ["mweb", "android", "web"]}},
         "retries": 10,
         "fragment_retries": 10,
@@ -79,6 +59,9 @@ def _base_ydl_opts(
         "quiet": True,
         "no_warnings": True,
     }
+    ffmpeg_location = ffmpeg_location_env()
+    if ffmpeg_location:
+        opts["ffmpeg_location"] = ffmpeg_location
     if use_cookies:
         if youtube_browser:
             opts["cookiesfrombrowser"] = (youtube_browser,)
@@ -108,7 +91,6 @@ async def download_track(
         outtmpl = str(output_dir / f"_dl_{temp_id}.%(ext)s")
         mp3_path = output_dir / f"_dl_{temp_id}.mp3"
 
-        # Clean up any leftover temp files from previous interrupted downloads
         for leftover in output_dir.glob("_dl_*"):
             try:
                 leftover.unlink()
@@ -132,7 +114,6 @@ async def download_track(
                 return f"Duration mismatch: expected {expected_duration_s:.0f}s, got {actual_s:.0f}s"
             return None
 
-        # 1. Deezer first
         if deezer_arl and artists and title:
             try:
                 download_from_deezer(
@@ -153,7 +134,6 @@ async def download_track(
                 deezer_error = str(e)
                 print(f"[Deezer] {e}", flush=True)
 
-        # 2. YouTube fallback
         if artists and title:
             primary = search_safe(artists[0])
             safe_title = search_safe(title)
@@ -179,11 +159,9 @@ async def download_track(
             def error(self, msg: str) -> None:
                 print(f"[YT error] {msg}", flush=True)
 
-        node_path = _find_node_path()
-
         def _ydl_opts(use_cookies: bool) -> dict:
             opts = _base_ydl_opts(
-                outtmpl, node_path,
+                outtmpl,
                 use_cookies=use_cookies,
                 youtube_cookies_path=youtube_cookies_path,
                 youtube_browser=youtube_browser,
@@ -336,11 +314,10 @@ async def download_from_url(
             raise ValueError("Only Deezer or YouTube links are supported")
 
         import yt_dlp
-        node_path = _find_node_path()
 
         def _ydl_opts(use_cookies: bool) -> dict:
             opts = _base_ydl_opts(
-                outtmpl, node_path,
+                outtmpl,
                 use_cookies=use_cookies,
                 youtube_cookies_path=youtube_cookies_path,
                 youtube_browser=youtube_browser,

@@ -29,7 +29,6 @@ def create_library(body: CreateLibraryRequest):
     for d in (playlists_dir, albums_dir, tracks_dir):
         d(body.root_path).mkdir(parents=True, exist_ok=True)
     config.libraries.append(lib)
-    config.setup_complete = True
     save_config(config)
     return lib
 

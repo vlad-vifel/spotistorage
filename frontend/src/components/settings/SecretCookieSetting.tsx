@@ -5,6 +5,7 @@ import { showSuccess } from "@/lib/toast";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
+import { CopyButton } from "@/components/common/CopyButton";
 
 interface Props {
   id: string;
@@ -50,25 +51,28 @@ export function SecretCookieSetting({
     <div className="space-y-3">
       <div className="flex flex-col gap-3">
         <Label htmlFor={id}>{label}</Label>
-        <div className="flex gap-2">
+        <div className="flex flex-col gap-2 sm:flex-row">
           <div className="relative flex-1">
             <Input
               id={id}
               type={showValue ? "text" : "password"}
-              className="pr-9 font-mono text-xs"
+              className="pr-16 font-mono text-xs"
               placeholder={placeholder}
               value={value}
               onChange={(e) => setDraft(e.target.value)}
               disabled={mutation.isPending}
             />
-            <button
-              type="button"
-              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-              onClick={() => setShowValue((v) => !v)}
-              aria-label={showValue ? "Hide" : "Show"}
-            >
-              {showValue ? <EyeOff className="size-3.5" /> : <Eye className="size-3.5" />}
-            </button>
+            <div className="absolute right-2.5 top-1/2 flex -translate-y-1/2 items-center gap-2.5">
+              {value && <CopyButton value={value} />}
+              <button
+                type="button"
+                className="p-2.5 -m-2.5 text-muted-foreground hover:text-foreground transition-colors"
+                onClick={() => setShowValue((v) => !v)}
+                aria-label={showValue ? "Hide" : "Show"}
+              >
+                {showValue ? <EyeOff className="size-3.5" /> : <Eye className="size-3.5" />}
+              </button>
+            </div>
           </div>
           {isDirty && (
             <Button onClick={handleSave} disabled={mutation.isPending}>

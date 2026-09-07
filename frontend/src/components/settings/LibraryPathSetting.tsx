@@ -2,6 +2,7 @@ import { useState, type FormEvent } from "react";
 import { FolderOpen, Plus, Loader2 } from "lucide-react";
 import { useConfig, useCreateLibrary } from "@/hooks/useConfig";
 import { useDeleteLibrary, useBrowseFolder, useSwitchLibrary } from "@/hooks/useLibrary";
+import { isAndroid, pickLibraryFolder } from "@/lib/androidBridge";
 import { DeleteLibraryDialog } from "./DeleteLibraryDialog";
 import { cn } from "@/lib/utils";
 import { showError } from "@/lib/toast";
@@ -15,8 +16,14 @@ export function LibraryPathSetting() {
   const deleteLibrary = useDeleteLibrary();
   const switchLibrary = useSwitchLibrary();
   const { browse, isBrowsing } = useBrowseFolder();
+  const android = isAndroid();
   const [name, setName] = useState("");
   const [path, setPath] = useState("");
+
+  const handleBrowseClick = () => {
+    if (android) pickLibraryFolder(setPath);
+    else browse(setPath);
+  };
 
   if (!config) return null;
 
@@ -26,7 +33,7 @@ export function LibraryPathSetting() {
     createLibrary.mutate(
       { name: name.trim(), path: path.trim() },
       {
-        onSuccess: () => { setPath(""); setName("My Music"); },
+        onSuccess: () => { setPath(""); setName(""); },
         onError: (e) => showError(e, "Failed to add library"),
       }
     );
@@ -73,14 +80,14 @@ export function LibraryPathSetting() {
 
       <form onSubmit={handleAdd} className="space-y-2">
         <p className="text-xs font-medium text-muted-foreground">Add library folder</p>
-        <div className="space-y-1.5">
+        <div className="space-y-4 md:space-y-1.5">
           <div className="flex flex-col gap-3">
             <Label htmlFor="add-lib-name">Name</Label>
             <Input
               id="add-lib-name"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="Music"
+              placeholder="Name"
               disabled={createLibrary.isPending}
             />
           </div>
@@ -92,7 +99,7 @@ export function LibraryPathSetting() {
                 <Input
                   id="add-lib-path"
                   className="pl-8"
-                  placeholder="C:\Music"
+                  placeholder="Folder path"
                   value={path}
                   onChange={(e) => setPath(e.target.value)}
                   disabled={createLibrary.isPending}
@@ -101,8 +108,8 @@ export function LibraryPathSetting() {
               <Button
                 type="button"
                 variant="outline"
-                className="h-9"
-                onClick={() => browse(setPath)}
+                className="shrink-0"
+                onClick={handleBrowseClick}
                 disabled={isBrowsing || createLibrary.isPending}
                 aria-label="Browse for folder"
               >
@@ -118,6 +125,7 @@ export function LibraryPathSetting() {
         <Button
           type="submit"
           size="sm"
+          className="max-md:w-full"
           disabled={!path.trim() || !name.trim() || createLibrary.isPending}
         >
           {createLibrary.isPending ? (

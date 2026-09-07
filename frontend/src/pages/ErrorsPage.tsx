@@ -1,116 +1,19 @@
-import { useState } from "react";
-import { Link } from "react-router-dom";
-import { AlertCircle, CheckCircle2, ChevronDown, ChevronUp, Copy, Link2, RotateCcw, X } from "lucide-react";
+import { CheckCircle2, Copy, RotateCcw, X } from "lucide-react";
 import {
-  useDownloads, useRetryDownload, useRetryWithUrl, useRetryAllFailed,
-  useCancelDownload, useClearAllFailed,
+  useDownloads, useRetryAllFailed, useClearAllFailed,
 } from "@/hooks/useDownloads";
 import { useSources } from "@/hooks/useSources";
+import { useCopyToClipboard } from "@/hooks/useCopyToClipboard";
 import { EmptyState } from "@/components/common/EmptyState";
+import { ErrorRow } from "@/components/errors/ErrorRow";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { showError } from "@/lib/toast";
-import type { DownloadJob } from "@/api/types";
-
-function ErrorRow({ job, sourceName }: { job: DownloadJob; sourceName: string }) {
-  const retry = useRetryDownload();
-  const retryWithUrl = useRetryWithUrl();
-  const clear = useCancelDownload();
-  const [expanded, setExpanded] = useState(false);
-  const [showUrlInput, setShowUrlInput] = useState(false);
-  const [url, setUrl] = useState("");
-
-  const submitUrl = () => {
-    const trimmed = url.trim();
-    if (!trimmed) return;
-    retryWithUrl.mutate(
-      { jobId: job.id, url: trimmed },
-      { onSuccess: () => { setShowUrlInput(false); setUrl(""); } }
-    );
-  };
-
-  return (
-    <div className="divide-y divide-border/30">
-      <div className="flex items-center gap-3 px-4 py-3">
-        <AlertCircle className="size-4 text-destructive shrink-0" />
-        <div className="min-w-0 flex-1">
-          <p className="text-sm truncate">
-            {job.track_artist && <span>{job.track_artist} – </span>}
-            {job.track_title}
-          </p>
-          <p className="text-xs text-muted-foreground truncate">
-            <Link to={`/library/${job.source_id}`} className="hover:underline">{sourceName}</Link>
-            {job.error && !expanded && ` · ${job.error}`}
-          </p>
-        </div>
-        <div className="flex items-center gap-2 shrink-0">
-          {job.error && (
-            <Button variant="ghost" size="sm" onClick={() => setExpanded((v) => !v)}>
-              {expanded ? <ChevronUp className="size-3.5" /> : <ChevronDown className="size-3.5" />}
-            </Button>
-          )}
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setShowUrlInput((v) => !v)}
-            aria-pressed={showUrlInput}
-          >
-            <Link2 className="size-3.5" /> Link
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => retry.mutate(job.id)}
-            disabled={retry.isPending}
-          >
-            <RotateCcw className="size-3.5" /> Retry
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => clear.mutate(job.id)}
-            disabled={clear.isPending}
-          >
-            <X className="size-3.5" /> Clear
-          </Button>
-        </div>
-      </div>
-      {showUrlInput && (
-        <div className="flex items-center gap-2 px-4 py-2 bg-muted/20">
-          <Input
-            value={url}
-            onChange={(e) => setUrl(e.target.value)}
-            onKeyDown={(e) => { if (e.key === "Enter") submitUrl(); }}
-            placeholder="Deezer or YouTube link for this track"
-            className="h-8 text-sm"
-            autoFocus
-          />
-          <Button
-            size="sm"
-            onClick={submitUrl}
-            disabled={retryWithUrl.isPending || !url.trim()}
-          >
-            <RotateCcw className="size-3.5" /> Try this link
-          </Button>
-        </div>
-      )}
-      {expanded && job.error && (
-        <div className="px-4 py-2 bg-destructive/5">
-          <pre className="text-xs text-destructive/80 whitespace-pre-wrap break-all font-mono leading-relaxed">
-            {job.error}
-          </pre>
-        </div>
-      )}
-    </div>
-  );
-}
 
 export function ErrorsPage() {
   const { failed } = useDownloads();
   const { data: sources = [] } = useSources();
   const retryAll = useRetryAllFailed();
   const clearAll = useClearAllFailed();
-  const [copied, setCopied] = useState(false);
+  const { copied, copy } = useCopyToClipboard(2000);
 
   const sourceName = (id: string) => sources.find((s) => s.id === id)?.name ?? id;
 
@@ -121,19 +24,13 @@ export function ErrorsPage() {
         return `${i + 1}. ${label}\n   ${j.error ?? "Unknown error"}`;
       })
       .join("\n\n");
-    navigator.clipboard.writeText(text).then(
-      () => {
-        setCopied(true);
-        setTimeout(() => setCopied(false), 2000);
-      },
-      (e) => showError(e, "Could not copy to clipboard")
-    );
+    copy(text);
   };
 
   return (
     <div className="flex flex-col gap-4 pt-6 pb-6">
-      <div className="flex items-center justify-between gap-4">
-        <div>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0">
           <h2 className="text-xl font-semibold">Failed downloads</h2>
           <p className="text-sm text-muted-foreground mt-0.5">
             {failed.length > 0
@@ -142,14 +39,24 @@ export function ErrorsPage() {
           </p>
         </div>
         {failed.length > 0 && (
-          <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" onClick={handleCopyErrors}>
+          <div className="flex items-center gap-2 flex-wrap">
+            <Button variant="outline" size="sm" className="max-md:hidden" onClick={handleCopyErrors}>
               <Copy className="size-3.5" />
               {copied ? "Copied!" : "Copy errors"}
             </Button>
             <Button
               variant="outline"
+              size="icon-sm"
+              className="md:hidden shrink-0"
+              onClick={handleCopyErrors}
+              aria-label={copied ? "Copied" : "Copy errors"}
+            >
+              <Copy className="size-3.5" />
+            </Button>
+            <Button
+              variant="outline"
               size="sm"
+              className="max-md:flex-1"
               onClick={() => retryAll.mutate(failed.map((j) => j.id))}
               disabled={retryAll.isPending}
             >
@@ -158,6 +65,7 @@ export function ErrorsPage() {
             <Button
               variant="outline"
               size="sm"
+              className="max-md:flex-1"
               onClick={() => clearAll.mutate()}
               disabled={clearAll.isPending}
             >

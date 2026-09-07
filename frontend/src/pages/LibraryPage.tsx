@@ -56,8 +56,8 @@ export function LibraryPage() {
   return (
     <div className="flex flex-col gap-6 pt-6 pb-6">
       <div className="flex flex-col gap-3">
-        <div className="flex items-start justify-between gap-4">
-          <div>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div className="min-w-0">
             <h2 className="text-xl font-semibold">Library</h2>
             {totalTracks > 0 ? (
               <div className="mt-1">
@@ -70,10 +70,11 @@ export function LibraryPage() {
             )}
           </div>
           {sources.length > 0 && (
-            <div className="flex items-center gap-2 shrink-0">
+            <div className="flex items-center gap-2 flex-wrap">
               <Button
                 variant="outline"
                 size="sm"
+                className="max-md:flex-1"
                 onClick={() => refreshAll.mutate()}
                 disabled={refreshAll.isPending}
               >
@@ -82,13 +83,15 @@ export function LibraryPage() {
               </Button>
               <Button
                 size="sm"
+                className="max-md:flex-1"
                 onClick={() => downloadAll.mutate()}
                 disabled={isDownloading || notDownloaded === 0}
               >
                 {downloadAll.isPending
                   ? <Loader2 className="size-3.5 animate-spin" />
                   : <Download className="size-3.5" />}
-                Download missing{notDownloaded > 0 ? ` (${notDownloaded})` : ""}
+                <span className="md:hidden">Download{notDownloaded > 0 ? ` (${notDownloaded})` : ""}</span>
+                <span className="max-md:hidden">Download missing{notDownloaded > 0 ? ` (${notDownloaded})` : ""}</span>
               </Button>
             </div>
           )}
@@ -96,7 +99,7 @@ export function LibraryPage() {
         <SearchInput
           value={search}
           onChange={setSearch}
-          placeholder="Search..."
+          placeholder="Search"
           className="w-full sm:w-48 self-start"
         />
       </div>

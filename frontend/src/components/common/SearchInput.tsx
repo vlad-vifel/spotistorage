@@ -9,12 +9,12 @@ interface Props {
   className?: string;
 }
 
-export function SearchInput({ value, onChange, placeholder = "Search...", className }: Props) {
+export function SearchInput({ value, onChange, placeholder = "Search", className }: Props) {
   return (
     <div className={cn("relative", className)}>
       <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground pointer-events-none" />
       <Input
-        className="pl-8 pr-8 h-8 text-xs"
+        className="pl-8 pr-8 md:h-8 md:text-xs"
         placeholder={placeholder}
         value={value}
         onChange={(e) => onChange(e.target.value)}

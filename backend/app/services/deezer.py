@@ -8,6 +8,11 @@ from pathlib import Path
 
 from app.services.matching import rank_candidates, search_safe
 
+_USER_AGENT = (
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+    "(KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36"
+)
+
 
 def _make_opener(arl: str) -> urllib.request.OpenerDirector:
     jar = http.cookiejar.CookieJar()
@@ -29,7 +34,9 @@ def _gw(opener: urllib.request.OpenerDirector, api_token: str, method: str, body
     data = json.dumps(body).encode()
     req = urllib.request.Request(url, data=data, method="POST", headers={
         "Content-Type": "application/json",
-        "User-Agent": "Mozilla/5.0",
+        "User-Agent": _USER_AGENT,
+        "Accept": "*/*",
+        "Accept-Language": "en-US,en;q=0.9",
     })
     with opener.open(req, timeout=15) as resp:
         return json.loads(resp.read())
@@ -53,7 +60,7 @@ def _get_stream_url(opener: urllib.request.OpenerDirector, license_token: str, t
         "https://media.deezer.com/v1/get_url",
         data=json.dumps(body).encode(),
         method="POST",
-        headers={"Content-Type": "application/json", "User-Agent": "Mozilla/5.0"},
+        headers={"Content-Type": "application/json", "User-Agent": _USER_AGENT},
     )
     with opener.open(req, timeout=15) as r:
         resp = json.loads(r.read())
@@ -119,7 +126,7 @@ def _fetch_track(
 
     stream_url, fmt = _get_stream_url(opener, license_token, track_token)
 
-    req = urllib.request.Request(stream_url, headers={"User-Agent": "Mozilla/5.0"})
+    req = urllib.request.Request(stream_url, headers={"User-Agent": _USER_AGENT})
     with opener.open(req, timeout=120) as r:
         raw = r.read()
 
@@ -134,7 +141,7 @@ def extract_track_id(url: str) -> str:
     m = re.search(r"/track/(\d+)", url)
     if m:
         return m.group(1)
-    req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+    req = urllib.request.Request(url, headers={"User-Agent": _USER_AGENT})
     with urllib.request.urlopen(req, timeout=10) as r:
         final_url = r.geturl()
     m = re.search(r"/track/(\d+)", final_url)

@@ -4,6 +4,8 @@ import { DependencyStatus } from "@/components/settings/DependencyStatus";
 import { SpotifyCookieSetting } from "@/components/settings/SpotifyCookieSetting";
 import { YoutubeCookiesSetting } from "@/components/settings/YoutubeCookiesSetting";
 import { DeezerArlSetting } from "@/components/settings/DeezerArlSetting";
+import { NotificationPermissionSetting } from "@/components/settings/NotificationPermissionSetting";
+import { isAndroid } from "@/lib/androidBridge";
 
 function SettingsSection({ title, description, children }: {
   title: string;
@@ -11,7 +13,7 @@ function SettingsSection({ title, description, children }: {
   children: ReactNode;
 }) {
   return (
-    <section className="rounded-xl border border-border/50 bg-card p-5">
+    <section className="rounded-xl border border-border/50 bg-card p-4 md:p-5">
       <div className="mb-4">
         <h3 className="text-base font-semibold">{title}</h3>
         {description && (
@@ -33,9 +35,23 @@ export function SettingsPage() {
 
       <SettingsSection
         title="Music libraries"
-        description="Your local music collections. Switch between them from the sidebar."
+        description="Your local music collections. Click one to make it active."
       >
         <LibraryPathSetting />
+      </SettingsSection>
+
+      <SettingsSection
+        title="Deezer"
+        description="Optional. Primary download source – fast and high quality. Requires an ARL token from your browser."
+      >
+        <DeezerArlSetting />
+      </SettingsSection>
+
+      <SettingsSection
+        title="YouTube"
+        description="Optional. Allows yt-dlp to use your YouTube session, which can help bypass age gates and access restrictions."
+      >
+        <YoutubeCookiesSetting />
       </SettingsSection>
 
       <SettingsSection
@@ -45,19 +61,11 @@ export function SettingsPage() {
         <SpotifyCookieSetting />
       </SettingsSection>
 
-      <SettingsSection
-        title="YouTube cookies"
-        description="Optional. Allows yt-dlp to use your YouTube session, which can help bypass age gates and access restrictions."
-      >
-        <YoutubeCookiesSetting />
-      </SettingsSection>
-
-      <SettingsSection
-        title="Deezer"
-        description="Optional. Primary download source — fast and high quality. Requires an ARL token from your browser."
-      >
-        <DeezerArlSetting />
-      </SettingsSection>
+      {isAndroid() && (
+        <SettingsSection title="Notifications">
+          <NotificationPermissionSetting />
+        </SettingsSection>
+      )}
 
       <SettingsSection
         title="System dependencies"

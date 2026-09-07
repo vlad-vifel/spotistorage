@@ -5,6 +5,7 @@ import { AlertCircle, RotateCcw } from "lucide-react";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Button } from "@/components/ui/button";
 import { useConfig } from "./hooks/useConfig";
+import { useIsMobile } from "./hooks/useIsMobile";
 import { AppShell } from "./components/layout/AppShell";
 import { LibraryPage } from "./pages/LibraryPage";
 import { SourcePage } from "./pages/SourcePage";
@@ -20,7 +21,7 @@ function BackendUnreachable({ onRetry }: { onRetry: () => void }) {
         <AlertCircle className="size-8 text-destructive" />
         <p className="text-sm font-medium">Cannot reach the backend</p>
         <p className="text-xs text-muted-foreground">
-          Make sure the SpotiStorage backend is running on :8000, then try again.
+          Try restarting the app, then try again.
         </p>
         <Button variant="outline" size="sm" onClick={onRetry}>
           <RotateCcw className="size-3.5" /> Retry
@@ -31,22 +32,30 @@ function BackendUnreachable({ onRetry }: { onRetry: () => void }) {
 }
 
 const CONNECTING_RETRIES = 3;
+const MAX_AUTO_RETRIES = 10;
+const RETRY_INTERVAL_MS = 2000;
+const RETRY_BACKOFF_MS = 10_000;
 
 function AppRoutes() {
   const { data: config, isLoading, isError, refetch } = useConfig();
   const [retryCount, setRetryCount] = useState(0);
+
+  const isBackingOff = retryCount >= MAX_AUTO_RETRIES;
 
   useEffect(() => {
     if (!isError) {
       setRetryCount(0);
       return;
     }
-    const interval = setInterval(() => {
-      setRetryCount((c) => c + 1);
-      refetch();
-    }, 2000);
+    const interval = setInterval(
+      () => {
+        setRetryCount((c) => c + 1);
+        refetch();
+      },
+      isBackingOff ? RETRY_BACKOFF_MS : RETRY_INTERVAL_MS
+    );
     return () => clearInterval(interval);
-  }, [isError, refetch]);
+  }, [isError, refetch, isBackingOff]);
 
   const isConnecting = isLoading || (isError && retryCount < CONNECTING_RETRIES);
 
@@ -80,12 +89,15 @@ function AppRoutes() {
 }
 
 export default function App() {
+  const isMobile = useIsMobile();
+
   return (
     <BrowserRouter>
       <TooltipProvider>
         <Toaster
           theme="dark"
-          position="bottom-right"
+          position={isMobile ? "top-center" : "bottom-right"}
+          mobileOffset={{ bottom: "calc(var(--bottom-nav-h) + 0.75rem)", left: "0.75rem", right: "0.75rem" }}
           toastOptions={{
             classNames: {
               toast: "bg-popover text-popover-foreground ring-1 ring-foreground/10 rounded-xl border-0",

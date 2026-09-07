@@ -11,7 +11,7 @@ export function SpotifyCookieSetting() {
     <SecretCookieSetting
       id="sp-dc"
       label="sp_dc cookie"
-      placeholder="AQD..."
+      placeholder="Cookie"
       savedValue={config.sp_dc}
       mutation={updateSpDc}
       savedMessage="Spotify cookie saved"

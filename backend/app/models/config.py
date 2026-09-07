@@ -17,3 +17,8 @@ class AppConfig(BaseModel):
     youtube_cookies_path: Optional[str] = None
     youtube_browser: Optional[str] = None
     deezer_arl: Optional[str] = None
+
+
+class AppConfigResponse(AppConfig):
+    platform: str = "desktop"
+    youtube_cookies_content: Optional[str] = None

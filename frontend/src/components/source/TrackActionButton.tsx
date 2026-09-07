@@ -1,5 +1,6 @@
 import { Download, RotateCcw, Trash2 } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { showError } from "@/lib/toast";
 import type { TrackStatus, DownloadJob } from "@/api/types";
 
 interface Props {
@@ -16,7 +17,7 @@ export function TrackActionButton({ status, job, onRetry, onDownload, onDelete }
       <Tooltip>
         <TooltipTrigger asChild>
           <button
-            className="text-muted-foreground hover:text-destructive transition-colors"
+            className="p-2.5 -m-2.5 text-muted-foreground hover:text-destructive transition-colors"
             onClick={onDelete}
             aria-label="Delete track"
           >
@@ -32,8 +33,11 @@ export function TrackActionButton({ status, job, onRetry, onDownload, onDelete }
       <Tooltip>
         <TooltipTrigger asChild>
           <button
-            className="text-destructive hover:text-destructive/70 transition-colors"
-            onClick={onRetry}
+            className="p-2.5 -m-2.5 text-destructive hover:text-destructive/70 transition-colors"
+            onClick={() => {
+              if (job?.error) showError(job.error, "Retrying");
+              onRetry();
+            }}
             aria-label="Retry download"
           >
             <RotateCcw size={14} />
@@ -48,7 +52,7 @@ export function TrackActionButton({ status, job, onRetry, onDownload, onDelete }
       <Tooltip>
         <TooltipTrigger asChild>
           <button
-            className="text-muted-foreground hover:text-foreground transition-colors"
+            className="p-2.5 -m-2.5 text-muted-foreground hover:text-foreground transition-colors"
             onClick={onDownload}
             aria-label="Download track"
           >

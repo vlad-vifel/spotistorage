@@ -11,7 +11,7 @@ export function DeezerArlSetting() {
     <SecretCookieSetting
       id="deezer-arl"
       label="ARL token"
-      placeholder="Paste your ARL cookie value here"
+      placeholder="ARL token"
       savedValue={config.deezer_arl}
       mutation={updateArl}
       savedMessage="Deezer ARL saved"
@@ -27,7 +27,7 @@ export function DeezerArlSetting() {
           >
             deezer.com
           </a>{" "}
-          in a browser, open DevTools, go to Application → Cookies, copy the{" "}
+          in a browser, open DevTools, go to Application, then Cookies, copy the{" "}
           <span className="font-mono text-foreground">arl</span> value and paste it here.
           A free account is enough.
         </>

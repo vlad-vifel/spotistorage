@@ -2,6 +2,7 @@ import type { CSSProperties, ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { Card } from "@/components/ui/card";
 import { SourceArtwork } from "@/components/common/SourceArtwork";
+import { useIsMobile } from "@/hooks/useIsMobile";
 import { cn } from "@/lib/utils";
 
 interface Props {
@@ -12,10 +13,10 @@ interface Props {
   artworkClassName: string;
   artworkIconClassName?: string;
   artworkStyle?: CSSProperties;
-  /** Wraps the artwork in a Link to this path, for cards that open a detail page. */
   artworkHref?: string;
   rightSlot?: ReactNode;
   children: ReactNode;
+  actions?: ReactNode;
 }
 
 export function MediaCard({
@@ -29,7 +30,10 @@ export function MediaCard({
   artworkHref,
   rightSlot,
   children,
+  actions,
 }: Props) {
+  const isMobile = useIsMobile();
+
   const artwork = artworkHref ? (
     <Link to={artworkHref} className={artworkClassName}>
       <SourceArtwork url={artworkUrl} name={artworkName} className="w-full h-full" />
@@ -45,11 +49,15 @@ export function MediaCard({
   );
 
   return (
-    <Card className={cn("flex overflow-hidden", className)}>
-      {artwork}
-      <div className={cn("flex flex-col justify-between min-w-0 flex-1", contentClassName)}>
-        {children}
+    <Card className={cn("overflow-hidden max-md:p-3 md:flex", className)}>
+      <div className="flex gap-3 md:contents">
+        {artwork}
+        <div className={cn("min-w-0 flex-1 md:flex md:flex-col md:justify-between", contentClassName)}>
+          {children}
+          {actions && !isMobile && <div className="md:mt-3">{actions}</div>}
+        </div>
       </div>
+      {actions && isMobile && <div className="mt-3">{actions}</div>}
       {rightSlot}
     </Card>
   );

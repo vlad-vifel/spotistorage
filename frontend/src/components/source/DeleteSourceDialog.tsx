@@ -25,7 +25,7 @@ export function DeleteSourceDialog({
 
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
-      <AlertDialogContent className="max-w-lg">
+      <AlertDialogContent className="md:max-w-lg">
         <AlertDialogHeader>
           <AlertDialogTitle>
             Delete "{source.name}"?
@@ -41,7 +41,7 @@ export function DeleteSourceDialog({
                 )}
               </p>
               {source.folder_path && (
-                <p className="font-mono text-sm text-foreground font-semibold whitespace-nowrap overflow-x-auto">
+                <p className="font-mono text-sm text-foreground font-semibold max-md:break-all max-md:whitespace-normal md:whitespace-nowrap md:overflow-x-auto">
                   {source.folder_path}
                 </p>
               )}

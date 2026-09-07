@@ -10,3 +10,16 @@ dist/
 frontend/node_modules/
 frontend/dist/
 .claude/
+
+# Android
+android/local.properties
+android/keystore.properties
+android/*.jks
+android/*.keystore
+android/.gradle/
+android/build/
+android/app/build/
+android/.idea/
+android/*.iml
+android/captures/
+

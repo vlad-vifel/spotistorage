@@ -28,8 +28,11 @@ export function useUpdateSpDc() {
 export function useUpdateYoutubeCookies() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (params: { youtube_cookies_path?: string | null; youtube_browser?: string | null }) =>
-      configApi.updateYoutubeCookies(params),
+    mutationFn: (params: {
+      youtube_cookies_path?: string | null;
+      youtube_browser?: string | null;
+      youtube_cookies_text?: string | null;
+    }) => configApi.updateYoutubeCookies(params),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["config"] }),
     onError: (e) => showError(e, "Failed to save YouTube settings"),
   });
@@ -57,11 +60,15 @@ export function useCreateLibrary() {
   return useMutation({
     mutationFn: ({ name, path }: { name: string; path: string }) =>
       configApi.createLibrary(name, path),
-    onSuccess: () => {
-      qc.setQueryData<AppConfig>(["config"], (old) =>
-        old ? { ...old, setup_complete: true } : old
-      );
-      qc.invalidateQueries({ queryKey: ["config"] });
-    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["config"] }),
+  });
+}
+
+export function useCompleteSetup() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => configApi.completeSetup(),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["config"] }),
+    onError: (e) => showError(e, "Failed to finish setup"),
   });
 }

@@ -7,8 +7,10 @@ export function DependencyStatus() {
 
   const items = [
     { key: "ffmpeg", label: "FFmpeg", ok: deps?.ffmpeg },
+    { key: "ffprobe", label: "ffprobe", ok: deps?.ffprobe },
     { key: "yt_dlp", label: "yt-dlp", ok: deps?.yt_dlp },
     { key: "pycryptodome", label: "pycryptodome", ok: deps?.pycryptodome },
+    { key: "js_runtime", label: "JS runtime (QuickJS)", ok: deps?.js_runtime },
   ];
 
   return (

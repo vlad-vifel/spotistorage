@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap');
+@import '@fontsource-variable/inter';
 
 @import 'tailwindcss';
 @import 'tw-animate-css';
@@ -117,42 +117,78 @@
   --sidebar-ring: oklch(0.552 0.016 285.938);
 }
 
+:root {
+  --bottom-nav-h: 3.5rem;
+}
+
+@media (width < 48rem) {
+  :root {
+    font-size: 17px;
+  }
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;
   }
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
   body {
     @apply bg-background text-foreground font-sans;
+    overscroll-behavior: none;
+  }
+  * {
+    -webkit-tap-highlight-color: transparent;
   }
   button:not(:disabled),
   [role='button']:not(:disabled) {
     cursor: pointer;
+    touch-action: manipulation;
   }
 }
 
-* {
-  scrollbar-width: thin;
-  scrollbar-color: oklch(0.552 0.016 285.938 / 35%) transparent;
+@utility page-bleed {
+  margin-inline: -1rem;
+  padding-inline: 1rem;
+  @media (width >= 40rem) {
+    margin-inline: -1.5rem;
+    padding-inline: 1.5rem;
+  }
 }
 
-::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+@utility tap-44 {
+  @media (width < 48rem) {
+    min-height: 2.75rem;
+    min-width: 2.75rem;
+  }
 }
 
-::-webkit-scrollbar-button {
-  display: none;
-}
+@media (hover: hover) and (pointer: fine) {
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: oklch(0.552 0.016 285.938 / 35%) transparent;
+  }
 
-::-webkit-scrollbar-track {
-  background: transparent;
-}
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
 
-::-webkit-scrollbar-thumb {
-  background: oklch(0.552 0.016 285.938 / 35%);
-  border-radius: 100%;
-}
+  ::-webkit-scrollbar-button {
+    display: none;
+  }
 
-::-webkit-scrollbar-thumb:hover {
-  background: oklch(0.552 0.016 285.938 / 60%);
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: oklch(0.552 0.016 285.938 / 35%);
+    border-radius: 3px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: oklch(0.552 0.016 285.938 / 60%);
+  }
 }

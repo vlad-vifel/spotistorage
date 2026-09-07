@@ -25,7 +25,7 @@ export function CompactBar({ compact, source, onRefreshed }: Props) {
   return (
     <>
       <div className={cn(
-        "flex items-center gap-3 overflow-hidden transition-[height] duration-150",
+        "max-md:hidden flex items-center gap-3 overflow-hidden transition-[height] duration-150",
         compact ? "h-12" : "h-0"
       )}>
         <SourceArtwork url={source.artwork_url} name={source.name} className="size-8 rounded shrink-0" />

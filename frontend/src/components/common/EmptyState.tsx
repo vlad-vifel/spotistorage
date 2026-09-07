@@ -7,7 +7,7 @@ interface Props {
 
 export function EmptyState({ icon: Icon, title, description, action }: Props) {
   return (
-    <div className="rounded-xl border border-border/50 bg-card p-12 flex flex-col items-center justify-center gap-4 text-center min-h-64">
+    <div className="rounded-xl border border-border/50 bg-card p-6 md:p-12 flex flex-col items-center justify-center gap-4 text-center min-h-48 md:min-h-64">
       <div className="size-12 rounded-full bg-muted flex items-center justify-center">
         <Icon className="size-6 text-muted-foreground" />
       </div>

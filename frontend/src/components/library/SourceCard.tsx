@@ -23,16 +23,24 @@ export function SourceCard({ source }: Props) {
       <MediaCard
         className="hover:bg-card/80 transition-colors"
         artworkHref={`/library/${source.id}`}
-        artworkClassName="shrink-0 w-34 h-34 self-start"
+        artworkClassName="shrink-0 max-md:size-20 max-md:overflow-hidden max-md:rounded-md max-md:ring-1 max-md:ring-input md:w-34 md:h-34 self-start"
         artworkUrl={source.artwork_url}
         artworkName={source.name}
-        contentClassName="p-3"
+        contentClassName="md:p-3"
+        actions={
+          <SourceActions
+            source={source}
+            actions={actions}
+            size="xs"
+            onDeleteClick={deleteFlow.openDelete}
+          />
+        }
       >
         <Link to={`/library/${source.id}`} className="min-w-0">
           <div className="flex items-start justify-between gap-2">
             <p className="text-xs text-muted-foreground capitalize">{source.type}</p>
             {source.last_refreshed && (
-              <p className="text-xs text-muted-foreground shrink-0">
+              <p className="text-xs text-muted-foreground shrink-0 max-md:hidden">
                 Last refreshed {formatLocalTime(source.last_refreshed)}
               </p>
             )}
@@ -42,15 +50,6 @@ export function SourceCard({ source }: Props) {
             {source.downloaded_tracks}/{source.total_tracks} downloaded
           </Badge>
         </Link>
-
-        <div className="mt-3">
-          <SourceActions
-            source={source}
-            actions={actions}
-            size="xs"
-            onDeleteClick={deleteFlow.openDelete}
-          />
-        </div>
       </MediaCard>
 
       <DeleteSourceDialog
