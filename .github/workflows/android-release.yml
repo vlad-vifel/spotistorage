@@ -1,8 +1,5 @@
 name: Android Release
 
-# Push a version tag (e.g. `v0.1.0`) to build the APK and publish it as a
-# GitHub Release. Ordinary pushes to main don't trigger this — tag on purpose
-# when you actually want a release cut.
 on:
   push:
     tags:
@@ -18,8 +15,6 @@ permissions:
 
 jobs:
   build:
-    # windows-latest, not ubuntu — android/app/build.gradle.kts' chaquopy.buildPython
-    # points at the backend venv's Windows layout (.venv/Scripts/python.exe).
     runs-on: windows-latest
 
     steps:
@@ -65,10 +60,24 @@ jobs:
           cp android/app/build/outputs/apk/debug/app-debug.apk \
              "dist/SpotiStorage-${{ steps.version.outputs.tag }}.apk"
 
+      - name: Resolve release notes
+        id: notes
+        shell: bash
+        run: |
+          f=".github/release-notes/${{ steps.version.outputs.tag }}.md"
+          if [ -f "$f" ]; then
+            echo "path=$f" >> "$GITHUB_OUTPUT"
+            echo "auto=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "path=" >> "$GITHUB_OUTPUT"
+            echo "auto=true" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.version.outputs.tag }}
           name: ${{ steps.version.outputs.tag }}
           files: dist/*.apk
-          generate_release_notes: true
+          body_path: ${{ steps.notes.outputs.path }}
+          generate_release_notes: ${{ steps.notes.outputs.auto }}
