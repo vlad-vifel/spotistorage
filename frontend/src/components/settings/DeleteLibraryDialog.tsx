@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Trash2 } from "lucide-react";
+import { Trash2, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel,
@@ -25,7 +25,7 @@ export function DeleteLibraryDialog({ lib, onConfirm, isPending }: Props) {
         disabled={isPending}
         aria-label={`Remove library "${lib.name}"`}
       >
-        <Trash2 className="size-3" />
+        {isPending ? <Loader2 className="size-3 animate-spin" /> : <Trash2 className="size-3" />}
       </Button>
       <AlertDialog open={open} onOpenChange={setOpen}>
         <AlertDialogContent>

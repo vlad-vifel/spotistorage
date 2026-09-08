@@ -50,20 +50,22 @@ export function LibraryPathSetting() {
               return (
                 <div
                   key={lib.id}
-                  onClick={isActive ? undefined : () => switchLibrary.mutate({ config, libraryId: lib.id })}
                   className={cn(
                     "flex items-center gap-3 rounded-md px-3 py-2 text-sm border transition-colors",
                     isActive
                       ? "border-border bg-muted/50"
-                      : "border-transparent hover:bg-muted/40 cursor-pointer"
+                      : "border-transparent hover:bg-muted/40"
                   )}
                 >
-                  <div className="min-w-0 flex-1">
+                  <div
+                    className={cn("min-w-0 flex-1", !isActive && "cursor-pointer")}
+                    onClick={isActive ? undefined : () => switchLibrary.mutate({ config, libraryId: lib.id })}
+                  >
                     <p className="font-medium truncate">{lib.name}</p>
                     <p className="text-xs text-muted-foreground font-mono truncate">{lib.root_path}</p>
                   </div>
                   {isActive ? (
-                    <span className="text-xs text-muted-foreground shrink-0">active</span>
+                    <span className="text-xs text-emerald-400 shrink-0">active</span>
                   ) : (
                     <DeleteLibraryDialog
                       lib={lib}

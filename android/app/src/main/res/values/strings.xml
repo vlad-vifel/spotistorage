@@ -3,4 +3,7 @@
     <string name="app_name">SpotiStorage</string>
     <string name="notification_channel_name">Downloads</string>
     <string name="notification_idle">SpotiStorage is running</string>
+    <string name="notification_downloading">Downloading %1$d/%2$d tracks</string>
+    <string name="notification_done">Downloaded %1$d tracks</string>
+    <string name="notification_done_with_errors">Downloaded %1$d tracks, %2$d failed</string>
 </resources>

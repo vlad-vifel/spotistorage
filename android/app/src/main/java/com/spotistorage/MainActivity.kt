@@ -25,6 +25,7 @@ class MainActivity : AppCompatActivity() {
 
     private lateinit var webView: WebView
     private lateinit var loadingOverlay: ProgressBar
+    private var pendingNavigation: String? = null
 
     private val folderPicker = registerForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
         onFolderPicked(uri)
@@ -66,6 +67,7 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
+        pendingNavigation = intent?.getStringExtra(ServerForegroundService.EXTRA_NAVIGATE_TO)
         ServerForegroundService.start(this)
         Thread({
             val ready = PythonServerManager.waitUntilReady()
@@ -78,6 +80,13 @@ class MainActivity : AppCompatActivity() {
                 )
             }
         }, "spotistorage-wait-ready").apply { isDaemon = true }.start()
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        val page = intent.getStringExtra(ServerForegroundService.EXTRA_NAVIGATE_TO) ?: return
+        runJs("window.__navigateTo && window.__navigateTo('${escapeJs(page)}')")
     }
 
     override fun onResume() {
@@ -103,6 +112,13 @@ class MainActivity : AppCompatActivity() {
             if (host == "127.0.0.1" || host == "localhost") return false
             startActivity(Intent(Intent.ACTION_VIEW, request.url))
             return true
+        }
+
+        override fun onPageFinished(view: WebView, url: String) {
+            pendingNavigation?.let { page ->
+                view.evaluateJavascript("window.__pendingNavigation='${escapeJs(page)}';window.__navigateTo&&window.__navigateTo('${escapeJs(page)}')", null)
+                pendingNavigation = null
+            }
         }
     }
 

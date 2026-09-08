@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useNavigate } from "react-router-dom";
 import { Toaster } from "sonner";
 import { AlertCircle, RotateCcw } from "lucide-react";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -13,6 +13,20 @@ import { SettingsPage } from "./pages/SettingsPage";
 import { SetupPage } from "./pages/SetupPage";
 import { AddPage } from "./pages/AddPage";
 import { ErrorsPage } from "./pages/ErrorsPage";
+
+function NavigationBridge() {
+  const navigate = useNavigate();
+  useEffect(() => {
+    (window as any).__navigateTo = (path: string) => navigate(path);
+    const pending = (window as any).__pendingNavigation as string | undefined;
+    if (pending) {
+      delete (window as any).__pendingNavigation;
+      navigate(pending);
+    }
+    return () => { delete (window as any).__navigateTo; };
+  }, [navigate]);
+  return null;
+}
 
 function BackendUnreachable({ onRetry }: { onRetry: () => void }) {
   return (
@@ -93,6 +107,7 @@ export default function App() {
 
   return (
     <BrowserRouter>
+      <NavigationBridge />
       <TooltipProvider>
         <Toaster
           theme="dark"
