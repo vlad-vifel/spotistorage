@@ -1,5 +1,7 @@
 import asyncio
+import logging
 import subprocess
+import time
 import uuid
 from pathlib import Path
 from typing import Callable
@@ -7,6 +9,11 @@ from app.core.paths import ffmpeg_location_env, resolve_ffmpeg_paths, resolve_qu
 
 _DURATION_THRESHOLD = 10.0
 _YOUTUBE_HOSTS = ("youtube.com", "youtu.be")
+logger = logging.getLogger(__name__)
+
+
+class DownloadCancelled(RuntimeError):
+    pass
 
 
 def _mp3_bitrate_kbps(path: Path) -> int | None:
@@ -52,7 +59,12 @@ def _cleanup_temp_files(output_dir: Path, temp_id: str) -> None:
             pass
 
 
-def _convert_to_mp3(output_dir: Path, temp_id: str, mp3_path: Path) -> None:
+def _convert_to_mp3(
+    output_dir: Path,
+    temp_id: str,
+    mp3_path: Path,
+    should_cancel: Callable[[], bool] | None = None,
+) -> None:
     if mp3_path.exists() and mp3_path.stat().st_size >= 10_000:
         return
 
@@ -70,17 +82,23 @@ def _convert_to_mp3(output_dir: Path, temp_id: str, mp3_path: Path) -> None:
         "-b:a", "192k",
         str(mp3_path),
     ]
-    result = subprocess.run(
+    process = subprocess.Popen(
         command,
         stdin=subprocess.DEVNULL,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         text=True,
-        check=False,
     )
-    if result.returncode != 0:
-        details = [line.strip() for line in result.stderr.splitlines() if line.strip()]
-        detail = details[-1] if details else f"exit code {result.returncode}"
+    while process.poll() is None:
+        if should_cancel and should_cancel():
+            process.terminate()
+            process.wait(timeout=5)
+            raise DownloadCancelled()
+        time.sleep(0.1)
+    _, stderr = process.communicate()
+    if process.returncode != 0:
+        details = [line.strip() for line in stderr.splitlines() if line.strip()]
+        detail = details[-1] if details else f"exit code {process.returncode}"
         raise RuntimeError(f"FFmpeg conversion failed: {detail}")
     if not mp3_path.exists() or mp3_path.stat().st_size < 10_000:
         raise RuntimeError("FFmpeg produced an empty MP3")
@@ -131,6 +149,7 @@ async def download_track(
     deezer_arl: str | None = None,
     expected_duration_s: float | None = None,
     on_progress: Callable[[float], None] | None = None,
+    should_cancel: Callable[[], bool] | None = None,
 ) -> tuple[Path, dict]:
     def _download() -> tuple[Path, dict]:
         import yt_dlp
@@ -151,6 +170,10 @@ async def download_track(
         deezer_error: str | None = None
         youtube_error: str | None = None
 
+        def _check_cancelled() -> None:
+            if should_cancel and should_cancel():
+                raise DownloadCancelled()
+
         def _check_duration(path: Path) -> str | None:
             """Returns an error message if the file's duration doesn't match, else None."""
             if not expected_duration_s or expected_duration_s <= 0:
@@ -166,12 +189,14 @@ async def download_track(
 
         if deezer_arl and artists and title:
             try:
+                _check_cancelled()
                 download_from_deezer(
                     artists, title, deezer_arl, mp3_path,
                     expected_duration_s=expected_duration_s,
                     duration_threshold=_DURATION_THRESHOLD,
                 )
                 if mp3_path.exists() and mp3_path.stat().st_size >= 10_000:
+                    _check_cancelled()
                     dur_error = _check_duration(mp3_path)
                     if dur_error is None:
                         return mp3_path, {"source": "deezer", "bitrate_kbps": _mp3_bitrate_kbps(mp3_path)}
@@ -180,9 +205,12 @@ async def download_track(
                 else:
                     mp3_path.unlink(missing_ok=True)
                     deezer_error = "downloaded file is empty"
+            except DownloadCancelled:
+                _cleanup_temp_files(output_dir, temp_id)
+                raise
             except Exception as e:
                 deezer_error = str(e)
-                print(f"[Deezer] {e}", flush=True)
+                logger.info("Deezer candidate failed: %s", e)
 
         if artists and title:
             primary = search_safe(artists[0])
@@ -192,6 +220,7 @@ async def download_track(
             queries = [f"ytsearch5:{track_id}"]
 
         def hook(d: dict) -> None:
+            _check_cancelled()
             if not on_progress or d.get("status") != "downloading":
                 return
             total = d.get("total_bytes") or d.get("total_bytes_estimate")
@@ -201,13 +230,11 @@ async def download_track(
 
         class _DebugLogger:
             def debug(self, msg: str) -> None:
-                low = msg.lower()
-                if any(k in low for k in ("[youtube]", "[youtube:search]", "extracting url", "downloading", "checking")):
-                    print(f"[YT] {msg}", flush=True)
+                return None
             def warning(self, msg: str) -> None:
-                print(f"[YT warn] {msg}", flush=True)
+                logger.warning("yt-dlp: %s", msg)
             def error(self, msg: str) -> None:
-                print(f"[YT error] {msg}", flush=True)
+                logger.error("yt-dlp: %s", msg)
 
         def _ydl_opts(use_cookies: bool) -> dict:
             opts = _base_ydl_opts(
@@ -222,8 +249,6 @@ async def download_track(
 
         has_cookies = bool(youtube_browser or youtube_cookies_path)
 
-        print(f"[YT] Searching: {queries}", flush=True)
-
         seen_ids: set[str] = set()
         all_entries: list[dict] = []
         flat_opts = {
@@ -234,10 +259,14 @@ async def download_track(
         }
         for query in queries:
             try:
+                _check_cancelled()
                 with yt_dlp.YoutubeDL(flat_opts) as ydl:
                     info = ydl.extract_info(query, download=False)
+            except DownloadCancelled:
+                _cleanup_temp_files(output_dir, temp_id)
+                raise
             except Exception as e:
-                print(f"[YT] Search error for {query!r}: {e}", flush=True)
+                logger.info("YouTube search failed: %s", e)
                 continue
             if not info:
                 continue
@@ -278,10 +307,9 @@ async def download_track(
 
         for cand in ranked[:3]:
             entry = cand["_entry"]
-            cand_dur = entry.get("duration")
             cand_id = entry.get("id") or entry.get("url", "").split("?v=")[-1]
             direct_url = entry.get("url") or entry.get("webpage_url") or f"https://www.youtube.com/watch?v={cand_id}"
-            print(f"[YT] Trying '{entry.get('title')}' dur={cand_dur}s → {direct_url[:60]}", flush=True)
+            _check_cancelled()
 
             if mp3_path.exists():
                 mp3_path.unlink()
@@ -291,17 +319,19 @@ async def download_track(
                 try:
                     with yt_dlp.YoutubeDL(_ydl_opts(use_cookies)) as ydl:
                         ydl.download([direct_url])
-                    _convert_to_mp3(output_dir, temp_id, mp3_path)
+                    _convert_to_mp3(output_dir, temp_id, mp3_path, should_cancel)
                     return True
+                except DownloadCancelled:
+                    _cleanup_temp_files(output_dir, temp_id)
+                    raise
                 except Exception as dl_exc:
                     youtube_error = str(dl_exc)
-                    print(f"[YT] Download error: {dl_exc}", flush=True)
+                    logger.info("YouTube download attempt failed: %s", dl_exc)
                     _cleanup_temp_files(output_dir, temp_id)
                     return False
 
             ok = _attempt(False)
             if not ok and youtube_error and "Sign in to confirm your age" in youtube_error and has_cookies:
-                print("[YT] Age-restricted, retrying with cookies", flush=True)
                 ok = _attempt(True)
 
             if not ok:
@@ -314,7 +344,6 @@ async def download_track(
 
             dur_error = _check_duration(mp3_path)
             if dur_error is not None:
-                print(f"[YT] Post-check fail: {dur_error}", flush=True)
                 mp3_path.unlink(missing_ok=True)
                 youtube_error = dur_error
                 continue
@@ -334,6 +363,7 @@ async def download_from_url(
     youtube_cookies_path: str | None = None,
     youtube_browser: str | None = None,
     deezer_arl: str | None = None,
+    should_cancel: Callable[[], bool] | None = None,
 ) -> tuple[Path, dict]:
     """Downloads a track from a user-supplied Deezer or YouTube URL directly,
     bypassing search and duration/keyword matching entirely — used when the
@@ -343,6 +373,10 @@ async def download_from_url(
         temp_id = str(uuid.uuid4())[:8]
         outtmpl = str(output_dir / f"_dl_{temp_id}.%(ext)s")
         mp3_path = output_dir / f"_dl_{temp_id}.mp3"
+
+        def _check_cancelled() -> None:
+            if should_cancel and should_cancel():
+                raise DownloadCancelled()
 
         for leftover in output_dir.glob("_dl_*"):
             try:
@@ -355,7 +389,9 @@ async def download_from_url(
             if not deezer_arl:
                 raise RuntimeError("No Deezer ARL configured in Settings")
             track_id = extract_track_id(url)
+            _check_cancelled()
             download_from_deezer_id(track_id, deezer_arl, mp3_path)
+            _check_cancelled()
             if not (mp3_path.exists() and mp3_path.stat().st_size >= 10_000):
                 mp3_path.unlink(missing_ok=True)
                 raise RuntimeError("Deezer: downloaded file is empty")
@@ -379,12 +415,13 @@ async def download_from_url(
         has_cookies = bool(youtube_browser or youtube_cookies_path)
         last_error: Exception | None = None
         for use_cookies in ([False, True] if has_cookies else [False]):
+            _check_cancelled()
             if mp3_path.exists():
                 mp3_path.unlink()
             try:
                 with yt_dlp.YoutubeDL(_ydl_opts(use_cookies)) as ydl:
                     ydl.download([url])
-                _convert_to_mp3(output_dir, temp_id, mp3_path)
+                _convert_to_mp3(output_dir, temp_id, mp3_path, should_cancel)
                 if mp3_path.exists() and mp3_path.stat().st_size >= 10_000:
                     return mp3_path, {"source": "youtube", "bitrate_kbps": _mp3_bitrate_kbps(mp3_path)}
                 _cleanup_temp_files(output_dir, temp_id)

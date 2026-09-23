@@ -5,6 +5,7 @@ if hasattr(sys.stderr, "reconfigure"):
     sys.stderr.reconfigure(encoding="utf-8", errors="replace")
 
 import asyncio
+import logging
 import os
 from pathlib import Path
 from fastapi import FastAPI, HTTPException
@@ -15,12 +16,14 @@ from starlette.requests import Request
 from starlette.responses import FileResponse, JSONResponse
 from contextlib import asynccontextmanager
 from app.api import config, libraries, sources, downloads, dependencies
-from app.services.download_queue import download_queue
 from app.services.config_store import load_config
+from app.services.download_queue import download_queue
 from app.services.library_scan import scan_library
 from app.services.state_store import sync_file_existence
 from app.services.deps_check import check_dependencies
 from app.services import db as db_svc
+
+logger = logging.getLogger(__name__)
 
 
 def _cleanup_temp_files(root: str) -> None:
@@ -41,13 +44,13 @@ def _sync_all_libraries(library_roots: list[str]) -> None:
         try:
             results = scan_library(root)
         except Exception as exc:
-            print(f"[BACKEND] WARNING: could not scan {root}: {exc}")
+            logger.warning("Could not scan %s: %s", root, exc)
             continue
         for folder, state in results:
             try:
                 sync_file_existence(folder, state)
             except Exception as exc:
-                print(f"[BACKEND] WARNING: could not sync '{state.name}': {exc}")
+                logger.warning("Could not sync %r: %s", state.name, exc)
 
 
 @asynccontextmanager
@@ -58,7 +61,7 @@ async def lifespan(app: FastAPI):
     deps = check_dependencies()
     if not deps["all_ok"]:
         missing = [k for k, v in deps.items() if k != "all_ok" and not v]
-        print(f"[BACKEND] WARNING: missing dependencies: {', '.join(missing)}")
+        logger.warning("Missing dependencies: %s", ", ".join(missing))
 
     sync_task = asyncio.create_task(asyncio.to_thread(_sync_all_libraries, [lib.root_path for lib in cfg.libraries]))
 

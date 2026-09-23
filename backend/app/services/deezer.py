@@ -1,5 +1,6 @@
 import hashlib
 import json
+import logging
 import re
 import urllib.request
 import urllib.parse
@@ -12,6 +13,7 @@ _USER_AGENT = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
     "(KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36"
 )
+logger = logging.getLogger(__name__)
 
 
 def _make_opener(arl: str) -> urllib.request.OpenerDirector:
@@ -158,7 +160,7 @@ def download_from_deezer_id(track_id: str, arl: str, output_path: Path) -> dict:
     title = track_data.get("SNG_TITLE", "")
     artist = track_data.get("ART_NAME", "")
     fmt = _fetch_track(opener, api_token, license_token, track_id, output_path)
-    print(f"[Deezer] {artist} - {title} → {fmt} ({output_path.stat().st_size // 1024}KB)", flush=True)
+    logger.info("Downloaded Deezer track %s - %s as %s", artist, title, fmt)
     return {"title": title, "artist": artist}
 
 
@@ -208,4 +210,4 @@ def download_from_deezer(
 
     track_id = ranked[0]["id"]
     fmt = _fetch_track(opener, api_token, license_token, track_id, output_path)
-    print(f"[Deezer] {ranked[0]['channel']} - {ranked[0]['title']} → {fmt} ({output_path.stat().st_size // 1024}KB)", flush=True)
+    logger.info("Downloaded Deezer track %s - %s as %s", ranked[0]["channel"], ranked[0]["title"], fmt)

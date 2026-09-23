@@ -14,6 +14,7 @@ import android.webkit.WebViewClient
 import android.widget.FrameLayout
 import android.widget.ProgressBar
 import androidx.activity.addCallback
+import androidx.activity.OnBackPressedCallback
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
@@ -25,6 +26,7 @@ class MainActivity : AppCompatActivity() {
 
     private lateinit var webView: WebView
     private lateinit var loadingOverlay: ProgressBar
+    private lateinit var backCallback: OnBackPressedCallback
     private var pendingNavigation: String? = null
 
     private val folderPicker = registerForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
@@ -60,11 +62,8 @@ class MainActivity : AppCompatActivity() {
         }
         setContentView(root)
 
-        onBackPressedDispatcher.addCallback(this) {
-            if (webView.canGoBack()) webView.goBack() else {
-                isEnabled = false
-                onBackPressedDispatcher.onBackPressed()
-            }
+        backCallback = onBackPressedDispatcher.addCallback(this) {
+            closeWebOverlayOrNavigateBack()
         }
 
         pendingNavigation = intent?.getStringExtra(ServerForegroundService.EXTRA_NAVIGATE_TO)
@@ -127,6 +126,26 @@ class MainActivity : AppCompatActivity() {
         runOnUiThread { webView.evaluateJavascript(script, null) }
     }
 
+    private fun closeWebOverlayOrNavigateBack() {
+        val script = """
+            (() => {
+              const overlay = document.querySelector('[role="alertdialog"][data-state="open"], [role="dialog"][data-state="open"]');
+              if (!overlay) return false;
+              const cancel = overlay.querySelector('[data-slot="alert-dialog-cancel"]');
+              if (cancel instanceof HTMLElement) cancel.click();
+              else document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', code: 'Escape', bubbles: true }));
+              return true;
+            })()
+        """.trimIndent()
+        webView.evaluateJavascript(script) { handled ->
+            if (handled == "true") return@evaluateJavascript
+            if (webView.canGoBack()) webView.goBack() else {
+                backCallback.isEnabled = false
+                onBackPressedDispatcher.onBackPressed()
+            }
+        }
+    }
+
     private fun escapeJs(s: String): String = s.replace("\\", "\\\\").replace("'", "\\'")
 
     fun launchFolderPicker() {
@@ -147,6 +166,10 @@ class MainActivity : AppCompatActivity() {
 
     fun checkNotificationPermission() {
         runJs("window.__onPermissionResult && window.__onPermissionResult('notifications', ${hasNotificationPermission()})")
+    }
+
+    fun checkStoragePermission() {
+        runJs("window.__onPermissionResult && window.__onPermissionResult('storage', ${Environment.isExternalStorageManager()})")
     }
 
     fun launchNotificationPermissionRequest() {

@@ -43,17 +43,28 @@ An Android build lives in `android/` – same backend, same UI, running inside a
 
 Want to build it yourself (e.g. to contribute)? You'll need Android Studio and the desktop backend's `.venv` set up first (`uv sync --directory backend`), then:
 ```
-npm run build --prefix frontend
-cd android
-./gradlew assembleDebug
+./install-android.sh
 ```
-The debug APK lands in `android/app/build/outputs/apk/debug/`.
+The script builds the current frontend, builds the APK and installs it on the connected device. It first tries an in-place update; if the installed APK has a different signing key, it removes that app package and installs the debug build. This reset removes app data, but not the music already stored in the selected library folder.
+
+To build without installing, run `./gradlew assembleDebug` from `android/`. Gradle builds the current frontend automatically. The debug APK lands in `android/app/build/outputs/apk/debug/`.
+
+## Checks
+
+```bash
+npm run lint --prefix frontend
+uv run --directory backend python -m unittest discover -s tests
+```
+
+Pull requests run the same frontend checks, backend tests and Android debug build in GitHub Actions.
+
+Signed release APKs use the repository Actions secrets `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS` and `ANDROID_KEY_PASSWORD`. The keystore itself must never be committed to the repository.
 
 ## File Structure
 
 ```
 {library_root}/
-├── Playlists/{name}/        # .spotify.json + 01 - Artist - Title.mp3
+├── Playlists/{name}/        # .spotify.json + 001 - Artist - Title.mp3
 ├── Albums/{artist} - {album}/
 └── Tracks/                  # standalone tracks
 ```

@@ -13,7 +13,7 @@ import android.os.IBinder
 import android.os.PowerManager
 import androidx.core.app.NotificationCompat
 import kotlin.math.roundToInt
-import org.json.JSONArray
+import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.net.URL
 
@@ -59,14 +59,25 @@ class ServerForegroundService : Service() {
         pollLoopRunning = true
         Thread({
             var sawActiveDownload = false
+            var unavailablePolls = 0
             while (pollLoopRunning) {
                 val progress = fetchProgress()
                 if (!progress.available) {
+                    unavailablePolls++
+                    if (unavailablePolls >= 10) {
+                        stopWithoutBatch()
+                        return@Thread
+                    }
                     Thread.sleep(1_000L)
                     continue
                 }
+                unavailablePolls = 0
                 if (!progress.active) {
-                    if (sawActiveDownload) finishBatch(progress) else stopWithoutBatch()
+                    if (sawActiveDownload || progress.done + progress.failed + progress.cancelled > 0) {
+                        finishBatch(progress)
+                    } else {
+                        stopWithoutBatch()
+                    }
                     return@Thread
                 }
 
@@ -90,37 +101,24 @@ class ServerForegroundService : Service() {
     )
 
     private fun fetchProgress(): Progress = try {
-        val conn = URL("${AppConfig.BASE_URL}/api/downloads").openConnection() as HttpURLConnection
+        val conn = URL("${AppConfig.BASE_URL}/api/downloads/summary").openConnection() as HttpURLConnection
         conn.connectTimeout = 1_500
         conn.readTimeout = 1_500
         conn.setRequestProperty("X-SpotiStorage-Token", PythonServerManager.apiToken)
         val body = conn.inputStream.bufferedReader().use { it.readText() }
         conn.disconnect()
 
-        val jobs = JSONArray(body)
-        var active = 0
-        var done = 0
-        var failed = 0
-        var cancelled = 0
-        var activeProgress = 0.0
-        var currentTrack: String? = null
-        for (i in 0 until jobs.length()) {
-            val job = jobs.getJSONObject(i)
-            when (job.optString("status")) {
-                "queued" -> active++
-                "downloading" -> {
-                    active++
-                    activeProgress += job.optDouble("progress", 0.0).coerceIn(0.0, 1.0)
-                    val trackTitle = job.optString("track_title")
-                    if (currentTrack == null && trackTitle.isNotBlank()) currentTrack = trackTitle
-                }
-                "done" -> done++
-                "failed" -> if (job.optString("error") == "Cancelled") cancelled++ else failed++
-            }
-        }
-        val total = jobs.length()
-        val percent = if (total == 0) 0 else ((done + activeProgress) / total * 100).roundToInt()
-        Progress(true, active > 0, done, failed, cancelled, total, percent, currentTrack)
+        val summary = JSONObject(body)
+        Progress(
+            available = true,
+            active = summary.optBoolean("active"),
+            done = summary.optInt("done"),
+            failed = summary.optInt("failed"),
+            cancelled = summary.optInt("cancelled"),
+            total = summary.optInt("total"),
+            percent = (summary.optDouble("percent", 0.0).coerceIn(0.0, 1.0) * 100).roundToInt(),
+            currentTrack = summary.optString("current_track").takeIf { it.isNotBlank() },
+        )
     } catch (e: Exception) {
         Progress(false, false, 0, 0, 0, 0, 0, null)
     }

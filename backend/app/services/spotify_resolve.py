@@ -89,7 +89,9 @@ async def resolve_url(url: str) -> dict:
                     "artists": [a.name for a in t.artists],
                     "album": data.name,
                     "album_artist": album_artist,
-                    "track_number": t.track_number or (i + 1),
+                    # Filenames must have one monotonic source position even
+                    # for multi-disc albums, where Spotify resets track_number.
+                    "track_number": i + 1,
                     "disc_number": 1,
                     "year": year,
                     "artwork_url": t_artwork or artwork_url,
@@ -164,7 +166,13 @@ async def resolve_user(url: str, sp_dc: str | None = None) -> dict:
                 "total_tracks": total,
             }
 
-        playlists = list(await asyncio.gather(*[_fetch_meta(p) for p in user.public_playlists]))
+        semaphore = asyncio.Semaphore(8)
+
+        async def _bounded_fetch(stub) -> dict:
+            async with semaphore:
+                return await _fetch_meta(stub)
+
+        playlists = list(await asyncio.gather(*[_bounded_fetch(p) for p in user.public_playlists]))
 
     return {
         "type": "user",

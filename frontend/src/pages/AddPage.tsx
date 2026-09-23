@@ -11,7 +11,13 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import type { ResolveResult, UserResolveResult } from "@/api/types";
 
 function isSpotifyUrl(value: string) {
-  return value.includes("spotify.com") || value.startsWith("spotify:");
+  if (value.startsWith("spotify:")) return true;
+  try {
+    const parsed = new URL(value);
+    return parsed.protocol === "https:" && (parsed.hostname === "spotify.com" || parsed.hostname.endsWith(".spotify.com"));
+  } catch {
+    return false;
+  }
 }
 
 export function AddPage() {

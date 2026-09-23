@@ -6,7 +6,7 @@ from app.services.spotify_resolve import (
     cache_resolved_tracks,
     get_cached_tracks,
 )
-from app.services.yt_download import download_track, download_from_url
+from app.services.yt_download import DownloadCancelled, download_track, download_from_url
 
 __all__ = [
     "resolve_url",
@@ -15,4 +15,5 @@ __all__ = [
     "get_cached_tracks",
     "download_track",
     "download_from_url",
+    "DownloadCancelled",
 ]

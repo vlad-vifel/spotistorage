@@ -47,6 +47,7 @@ export function useDownloadSource() {
     },
     onSettled: (_, __, sourceId) => {
       qc.invalidateQueries({ queryKey: ["downloads"] });
+      qc.invalidateQueries({ queryKey: ["download-summary"] });
       qc.invalidateQueries({ queryKey: ["sources"] });
       qc.invalidateQueries({ queryKey: ["source", sourceId] });
     },
@@ -91,6 +92,7 @@ export function useDeleteSource() {
 export function useRefreshAllSources() {
   const qc = useQueryClient();
   return useMutation({
+    mutationKey: ["refresh-all"],
     mutationFn: () => sourcesApi.refreshAll(),
     onSuccess: (result) => {
       const parts: string[] = [];
@@ -110,10 +112,12 @@ export function useDownloadAllMissing() {
   return useMutation({
     mutationFn: () => sourcesApi.downloadAll(),
     onSuccess: (result) => {
-      if (result.queued > 0) startDownloadService();
-      if (result.queued === 0) showInfo("Everything is already downloaded");
+      if (result.queued > 0 || result.preparing) startDownloadService();
+      if (result.preparing) showSuccess(`Preparing ${pluralize(result.total ?? 0, "track")}`);
+      else if (result.queued === 0) showInfo("Everything is already downloaded");
       else showSuccess(`Queued ${pluralize(result.queued, "track")}`);
       qc.invalidateQueries({ queryKey: ["downloads"] });
+      qc.invalidateQueries({ queryKey: ["download-summary"] });
       qc.invalidateQueries({ queryKey: ["sources"] });
     },
     onError: (e) => showError(e, "Download all failed"),
@@ -192,6 +196,7 @@ export function useDownloadSingleTrack() {
     },
     onSettled: (_, __, { sourceId }) => {
       qc.invalidateQueries({ queryKey: ["downloads"] });
+      qc.invalidateQueries({ queryKey: ["download-summary"] });
       qc.invalidateQueries({ queryKey: ["source", sourceId] });
     },
   });

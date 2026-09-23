@@ -57,13 +57,15 @@ export function LibraryPathSetting() {
                       : "border-transparent hover:bg-muted/40"
                   )}
                 >
-                  <div
-                    className={cn("min-w-0 flex-1", !isActive && "cursor-pointer")}
-                    onClick={isActive ? undefined : () => switchLibrary.mutate({ config, libraryId: lib.id })}
+                  <button
+                    type="button"
+                    className={cn("min-w-0 flex-1 text-left", !isActive && "cursor-pointer")}
+                    onClick={() => switchLibrary.mutate({ config, libraryId: lib.id })}
+                    disabled={isActive || switchLibrary.isPending}
                   >
                     <p className="font-medium truncate">{lib.name}</p>
                     <p className="text-xs text-muted-foreground font-mono truncate">{lib.root_path}</p>
-                  </div>
+                  </button>
                   {isActive ? (
                     <span className="text-xs text-emerald-400 shrink-0">active</span>
                   ) : (

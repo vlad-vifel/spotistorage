@@ -7,15 +7,17 @@ import { Progress } from "@/components/ui/progress";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 
 export function DownloadBar() {
-  const { active, failed, done } = useDownloads();
+  const { active, failed, done, summary } = useDownloads();
   const isMobile = useIsMobile();
   const [expanded, setExpanded] = useState(false);
 
-  const visible = active.length > 0 || failed.length > 0;
+  const visible = summary?.active || active.length > 0 || failed.length > 0;
   if (!visible) return null;
 
-  const batchTotal = active.length + done.length;
-  const progressPct = batchTotal > 0 ? (done.length / batchTotal) * 100 : 0;
+  const batchTotal = summary?.total ?? active.length + done.length;
+  const batchDone = summary?.done ?? done.length;
+  const batchFailed = summary?.failed ?? failed.length;
+  const progressPct = (summary?.percent ?? (batchTotal > 0 ? batchDone / batchTotal : 0)) * 100;
 
   return (
     <div className="border-t border-border/50">
@@ -27,18 +29,18 @@ export function DownloadBar() {
         aria-expanded={expanded}
       >
         <div className="flex items-center gap-3 px-4 py-1.5 md:px-6 md:py-2">
-          {active.length > 0 && (
+          {(summary?.active || active.length > 0) && (
             <Loader2 className="size-3.5 animate-spin text-muted-foreground shrink-0" />
           )}
           <Progress value={progressPct} className="flex-1 h-1" />
           <div className="flex items-center gap-3 shrink-0">
             <span className="text-xs text-muted-foreground tabular-nums">
-              {done.length}/{batchTotal}
+              {batchDone}/{batchTotal}
             </span>
-            {failed.length > 0 && (
+            {batchFailed > 0 && (
               <span className="flex items-center gap-1 text-xs text-destructive">
                 <AlertCircle className="size-3" />
-                {failed.length}
+                {batchFailed}
               </span>
             )}
             {expanded

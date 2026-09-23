@@ -1,4 +1,5 @@
 import asyncio
+import logging
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from app.services.download_queue import download_queue
@@ -10,6 +11,7 @@ from app.services.download_orchestration import resolve_source_tracks, missing_t
 from app.api.sources import _active_library
 
 router = APIRouter(prefix="/api", tags=["downloads"])
+logger = logging.getLogger(__name__)
 
 # Caps how many sources we refresh/resolve against Spotify at once, so a large
 # library doesn't hammer Spotify with hundreds of simultaneous requests.
@@ -23,6 +25,11 @@ def _active_root():
 @router.get("/downloads")
 def list_downloads():
     return download_queue.list_jobs()
+
+
+@router.get("/downloads/summary")
+def download_summary():
+    return download_queue.summary()
 
 
 @router.post("/downloads/clear-failed")
@@ -81,7 +88,7 @@ async def refresh_all_sources():
                 _, result = await refresh_source_state(folder, state)
                 return result
             except Exception as exc:
-                print(f"[BACKEND] refresh failed for {state.name!r}: {exc}", flush=True)
+                logger.warning("Refresh failed for %r: %s", state.name, exc)
                 error_details.append(f"{state.name}: {exc}")
                 return None
 
@@ -101,39 +108,48 @@ async def refresh_all_sources():
 
 @router.post("/sources/download-all", status_code=202)
 async def download_all_missing():
-    await download_queue.clear_done_if_idle()
     root = _active_root()
-    results = scan_library(root)
-    sem = asyncio.Semaphore(_NETWORK_CONCURRENCY)
-    error_details: list[str] = []
-
-    async def _prepare_one(folder, state) -> tuple | None:
+    results = sorted(scan_library(root), key=lambda item: (item[1].type.value, item[1].name.lower(), str(item[0]).lower()))
+    entries = []
+    planned_total = 0
+    for folder, state in results:
         state = sync_file_existence(folder, state)
-        source_id = state.spotify_id
-        in_progress = download_queue.get_in_progress_track_ids(source_id)
-        missing_ids = missing_track_ids(state, in_progress)
-        if not missing_ids:
-            return None
+        missing_ids = missing_track_ids(state, download_queue.get_in_progress_track_ids(state.spotify_id))
+        if missing_ids:
+            entries.append((folder, state, missing_ids))
+            planned_total += len(missing_ids)
+    if not planned_total:
+        return {"queued": 0, "preparing": False}
+    batch_id = await download_queue.begin_batch(planned_total, preparing=True)
+    asyncio.create_task(_populate_download_all(batch_id, entries))
+    return {"queued": 0, "preparing": True, "batch_id": batch_id, "total": planned_total}
+
+
+async def _populate_download_all(batch_id: str, entries: list[tuple]) -> None:
+    sem = asyncio.Semaphore(_NETWORK_CONCURRENCY)
+
+    async def prepare_one(folder, state, missing_ids) -> tuple | None:
         async with sem:
             try:
-                resolved_by_id = await resolve_source_tracks(source_id, state.spotify_url)
+                resolved_by_id = await resolve_source_tracks(state.spotify_id, state.spotify_url)
             except Exception as exc:
-                print(f"[BACKEND] resolve failed for {state.name!r}: {exc}", flush=True)
-                error_details.append(f"{state.name}: {exc}")
+                logger.warning("Download preparation failed for %r: %s", state.name, exc)
+                download_queue.mark_preparation_failed(batch_id, len(missing_ids))
                 return None
-        tracks_to_dl = [resolved_by_id[tid] for tid in missing_ids if tid in resolved_by_id]
-        return source_id, folder, tracks_to_dl
+        return state.spotify_id, folder, [resolved_by_id[track_id] for track_id in missing_ids if track_id in resolved_by_id]
 
-    prepared = await asyncio.gather(*[_prepare_one(folder, state) for folder, state in results])
-
-    total_queued = 0
-    for entry in prepared:
-        if not entry:
-            continue
-        source_id, folder, tracks_to_dl = entry
-        jobs = await download_queue.enqueue_source(source_id, folder, tracks_to_dl)
-        total_queued += len(jobs)
-    return {"queued": total_queued, "error_details": error_details}
+    tasks = [asyncio.create_task(prepare_one(folder, state, missing_ids)) for folder, state, missing_ids in entries]
+    try:
+        for task in tasks:
+            if not download_queue.is_batch_open(batch_id):
+                return
+            prepared = await task
+            if prepared:
+                source_id, folder, tracks = prepared
+                if download_queue.is_batch_open(batch_id):
+                    await download_queue.enqueue_source(source_id, folder, tracks, batch_id=batch_id)
+    finally:
+        download_queue.set_batch_preparing(batch_id, False)
 
 
 @router.post("/sources/{source_id}/tracks/{track_id}/download", status_code=202)

@@ -11,7 +11,7 @@ interface Props {
   style?: CSSProperties;
 }
 
-export function SourceArtwork({ url, name, className, icon: Icon = Music2, iconClassName, style }: Props) {
+export function SourceArtwork({ url, name: _name, className, icon: Icon = Music2, iconClassName, style }: Props) {
   if (url) {
     return (
       <img

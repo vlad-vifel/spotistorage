@@ -14,7 +14,6 @@ interface Props {
   artworkIconClassName?: string;
   artworkStyle?: CSSProperties;
   artworkHref?: string;
-  rightSlot?: ReactNode;
   children: ReactNode;
   actions?: ReactNode;
 }
@@ -28,7 +27,6 @@ export function MediaCard({
   artworkIconClassName,
   artworkStyle,
   artworkHref,
-  rightSlot,
   children,
   actions,
 }: Props) {
@@ -58,7 +56,6 @@ export function MediaCard({
         </div>
       </div>
       {actions && isMobile && <div className="mt-3">{actions}</div>}
-      {rightSlot}
     </Card>
   );
 }

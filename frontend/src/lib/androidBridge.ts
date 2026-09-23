@@ -1,6 +1,7 @@
 export interface AndroidBridge {
   pickLibraryFolder(): void;
   requestStoragePermission(): void;
+  checkStoragePermission(): void;
   requestNotificationPermission(): void;
   checkNotificationPermission(): void;
   startDownloadService(): void;
@@ -57,6 +58,11 @@ export function requestNotificationPermission(onResult: (granted: boolean) => vo
 export function checkNotificationPermission(onResult: (granted: boolean) => void): void {
   listenOnce("notifications", onResult);
   window.AndroidBridge?.checkNotificationPermission();
+}
+
+export function checkStoragePermission(onResult: (granted: boolean) => void): void {
+  listenOnce("storage", onResult);
+  window.AndroidBridge?.checkStoragePermission();
 }
 
 export function startDownloadService(): void {

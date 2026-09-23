@@ -1,21 +1,19 @@
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
-import { useNavigate } from "react-router-dom";
-import { useDownloads } from "./useDownloads";
+import { useDownloadSummary } from "./useDownloads";
 import { isAndroid, startDownloadService } from "@/lib/androidBridge";
 
-export type LastBatch = { done: number; failed: number } | null;
+export type LastBatch = { done: number; failed: number; cancelled: number } | null;
 
 export function useDownloadNotifications() {
-  const { active, done, failed } = useDownloads();
+  const { data: summary } = useDownloadSummary();
   const wasActiveRef = useRef(false);
   const [lastBatch, setLastBatch] = useState<LastBatch>(null);
   const qc = useQueryClient();
-  const navigate = useNavigate();
 
   useEffect(() => {
-    const isActive = active.length > 0;
+    const isActive = summary?.active ?? false;
     const wasActive = wasActiveRef.current;
 
     if (isActive && !wasActive) {
@@ -25,29 +23,26 @@ export function useDownloadNotifications() {
 
     if (wasActive && !isActive) {
       qc.invalidateQueries({ queryKey: ["sources"] });
-      const doneCount = done.length;
-      const failedCount = failed.length;
+      const doneCount = summary?.done ?? 0;
+      const failedCount = summary?.failed ?? 0;
+      const cancelledCount = summary?.cancelled ?? 0;
 
-      if (doneCount > 0 || failedCount > 0) {
-        setLastBatch({ done: doneCount, failed: failedCount });
+      if (doneCount > 0 || failedCount > 0 || cancelledCount > 0) {
+        setLastBatch({ done: doneCount, failed: failedCount, cancelled: cancelledCount });
 
-        if (failedCount === 0) {
-          const sourceIds = new Set(done.map((j) => j.source_id));
-          const target = sourceIds.size === 1 ? `/library/${[...sourceIds][0]}` : "/library";
-          toast.success(`Downloaded ${doneCount} track${doneCount === 1 ? "" : "s"}`, {
-            action: { label: "Open", onClick: () => navigate(target) },
-          });
+        if (failedCount === 0 && cancelledCount === 0) {
+          toast.success(`Downloaded ${doneCount} track${doneCount === 1 ? "" : "s"}`);
         } else {
-          toast.warning(
-            `Downloaded ${doneCount} track${doneCount === 1 ? "" : "s"} · ${failedCount} failed`,
-            { action: { label: "View", onClick: () => navigate("/errors") } }
-          );
+          const parts = [`Downloaded ${doneCount} track${doneCount === 1 ? "" : "s"}`];
+          if (failedCount) parts.push(`${failedCount} failed`);
+          if (cancelledCount) parts.push(`${cancelledCount} cancelled`);
+          toast.warning(parts.join(" · "));
         }
       }
     }
 
     wasActiveRef.current = isActive;
-  }, [active.length, done.length, failed.length]);
+  }, [summary?.active, summary?.batch_id, summary?.done, summary?.failed, summary?.cancelled]);
 
   return { lastBatch, clearLastBatch: () => setLastBatch(null) };
 }

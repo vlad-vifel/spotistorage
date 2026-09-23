@@ -39,9 +39,35 @@ jobs:
           npm ci --prefix frontend
           npm run build --prefix frontend
 
-      - name: Build debug APK
+      - name: Prepare release keystore
+        shell: pwsh
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          foreach ($name in @(
+            "ANDROID_KEYSTORE_BASE64",
+            "ANDROID_KEYSTORE_PASSWORD",
+            "ANDROID_KEY_ALIAS",
+            "ANDROID_KEY_PASSWORD"
+          )) {
+            if ([string]::IsNullOrWhiteSpace([Environment]::GetEnvironmentVariable($name))) {
+              throw "$name is not configured"
+            }
+          }
+          $keystorePath = Join-Path $env:GITHUB_WORKSPACE "android\release.keystore"
+          [IO.File]::WriteAllBytes($keystorePath, [Convert]::FromBase64String($env:ANDROID_KEYSTORE_BASE64))
+
+      - name: Build signed release APK
         working-directory: android
-        run: ./gradlew assembleDebug --no-daemon
+        env:
+          ANDROID_SIGNING_STORE_FILE: ${{ github.workspace }}/android/release.keystore
+          ANDROID_SIGNING_STORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_SIGNING_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_SIGNING_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: .\gradlew.bat assembleRelease --no-daemon
 
       - name: Resolve version tag
         id: version
@@ -57,7 +83,7 @@ jobs:
         shell: bash
         run: |
           mkdir -p dist
-          cp android/app/build/outputs/apk/debug/app-debug.apk \
+          cp android/app/build/outputs/apk/release/app-release.apk \
              "dist/SpotiStorage-${{ steps.version.outputs.tag }}.apk"
 
       - name: Resolve release notes

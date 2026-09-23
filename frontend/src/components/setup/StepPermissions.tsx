@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { HardDrive, Bell, type LucideIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { PermissionStatus, type PermState } from "@/components/common/PermissionStatus";
-import { requestStoragePermission, requestNotificationPermission, checkNotificationPermission } from "@/lib/androidBridge";
+import { checkStoragePermission, requestStoragePermission, requestNotificationPermission, checkNotificationPermission } from "@/lib/androidBridge";
 
 interface Props {
   onBack: () => void;
@@ -14,6 +14,7 @@ export function StepPermissions({ onBack, onNext }: Props) {
   const [notifications, setNotifications] = useState<PermState>("pending");
 
   useEffect(() => {
+    checkStoragePermission((granted) => setStorage(granted ? "granted" : "denied"));
     checkNotificationPermission((granted) => granted && setNotifications("granted"));
   }, []);
 

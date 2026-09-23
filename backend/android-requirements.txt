@@ -1,0 +1,10 @@
+# Chaquopy-compatible runtime dependencies. Keep package names aligned with pyproject.toml.
+pydantic<2
+fastapi==0.103.2
+uvicorn
+mutagen
+aiosqlite
+pycryptodome
+spotifyscraper
+yt-dlp
+yt-dlp-ejs

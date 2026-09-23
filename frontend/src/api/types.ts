@@ -6,6 +6,7 @@ export type TrackStatus =
   | "queued"
   | "downloading"
   | "failed"
+  | "cancelled"
   | "removed_from_source"
   | "wrong_track";
 
@@ -74,7 +75,7 @@ export interface UserResolveResult {
 
 export type AnyResolveResult = ResolveResult | UserResolveResult;
 
-export type JobStatus = "queued" | "downloading" | "done" | "failed";
+export type JobStatus = "queued" | "downloading" | "done" | "failed" | "cancelled";
 
 export interface DownloadJob {
   id: string;
@@ -85,6 +86,18 @@ export interface DownloadJob {
   status: JobStatus;
   progress: number;
   error?: string;
+}
+
+export interface DownloadSummary {
+  batch_id?: string | null;
+  active: boolean;
+  preparing: boolean;
+  total: number;
+  done: number;
+  failed: number;
+  cancelled: number;
+  percent: number;
+  current_track?: string | null;
 }
 
 export interface Library {
@@ -116,6 +129,9 @@ export interface DepsStatus {
 
 export interface QueuedResult {
   queued: number;
+  preparing?: boolean;
+  batch_id?: string;
+  total?: number;
 }
 
 export interface RefreshResult {

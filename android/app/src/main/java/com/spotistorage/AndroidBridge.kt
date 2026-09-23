@@ -15,6 +15,11 @@ class AndroidBridge(private val activity: MainActivity) {
     }
 
     @JavascriptInterface
+    fun checkStoragePermission() {
+        activity.runOnUiThread { activity.checkStoragePermission() }
+    }
+
+    @JavascriptInterface
     fun requestNotificationPermission() {
         activity.runOnUiThread { activity.launchNotificationPermissionRequest() }
     }

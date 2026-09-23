@@ -6,6 +6,18 @@ plugins {
     id("com.chaquo.python")
 }
 
+val signingPropertiesFile = rootProject.file("keystore.properties")
+val signingProperties = Properties()
+if (signingPropertiesFile.exists()) {
+    signingPropertiesFile.inputStream().use(signingProperties::load)
+}
+val signingStorePath = System.getenv("ANDROID_SIGNING_STORE_FILE") ?: signingProperties.getProperty("storeFile")
+val signingStorePassword = System.getenv("ANDROID_SIGNING_STORE_PASSWORD") ?: signingProperties.getProperty("storePassword")
+val signingKeyAlias = System.getenv("ANDROID_SIGNING_KEY_ALIAS") ?: signingProperties.getProperty("keyAlias")
+val signingKeyPassword = System.getenv("ANDROID_SIGNING_KEY_PASSWORD") ?: signingProperties.getProperty("keyPassword")
+val hasReleaseSigning = listOf(signingStorePath, signingStorePassword, signingKeyAlias, signingKeyPassword)
+    .all { !it.isNullOrBlank() }
+
 android {
     namespace = "com.spotistorage"
     compileSdk = 36
@@ -14,8 +26,8 @@ android {
         applicationId = "com.spotistorage"
         minSdk = 33
         targetSdk = 36
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = 3
+        versionName = "0.1.2"
 
         ndk {
             abiFilters += "arm64-v8a"
@@ -24,14 +36,11 @@ android {
 
     signingConfigs {
         create("release") {
-            val propsFile = rootProject.file("keystore.properties")
-            if (propsFile.exists()) {
-                val props = Properties()
-                props.load(propsFile.inputStream())
-                storeFile = file(props.getProperty("storeFile"))
-                storePassword = props.getProperty("storePassword")
-                keyAlias = props.getProperty("keyAlias")
-                keyPassword = props.getProperty("keyPassword")
+            if (hasReleaseSigning) {
+                storeFile = file(signingStorePath!!)
+                storePassword = signingStorePassword!!
+                keyAlias = signingKeyAlias!!
+                keyPassword = signingKeyPassword!!
             }
         }
     }
@@ -43,7 +52,7 @@ android {
         release {
             isMinifyEnabled = false
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
-            if (rootProject.file("keystore.properties").exists()) {
+            if (hasReleaseSigning) {
                 signingConfig = signingConfigs.getByName("release")
             }
         }
@@ -76,15 +85,10 @@ chaquopy {
         buildPython(rootDir.resolve("../backend/.venv/Scripts/python.exe").absolutePath)
 
         pip {
-            install("pydantic<2")
-            install("fastapi==0.103.2")
-            install("uvicorn")
-            install("mutagen")
-            install("aiosqlite")
-            install("pycryptodome")
-            install("spotifyscraper")
-            install("yt-dlp")
-            install("yt-dlp-ejs")
+            rootProject.file("../backend/android-requirements.txt").readLines()
+                .map(String::trim)
+                .filter { it.isNotEmpty() && !it.startsWith("#") }
+                .forEach(::install)
         }
     }
     sourceSets {
@@ -94,6 +98,28 @@ chaquopy {
             include("app/**", "index.html", "assets/**", "favicon.svg")
         }
     }
+}
+
+val frontendDir = rootProject.file("../frontend")
+val frontendDist = frontendDir.resolve("dist")
+val npmCommand = if (System.getProperty("os.name").lowercase().contains("win")) "npm.cmd" else "npm"
+
+tasks.register<Exec>("buildFrontend") {
+    workingDir = rootProject.file("..")
+    commandLine(npmCommand, "run", "build", "--prefix", "frontend")
+    inputs.dir(frontendDir.resolve("src"))
+    inputs.file(frontendDir.resolve("package.json"))
+    inputs.file(frontendDir.resolve("tsconfig.json"))
+    inputs.file(frontendDir.resolve("vite.config.ts"))
+    outputs.dir(frontendDist)
+}
+
+tasks.named("preBuild").configure {
+    dependsOn("buildFrontend")
+}
+
+tasks.matching { it.name.startsWith("merge") && it.name.endsWith("PythonSources") }.configureEach {
+    dependsOn("buildFrontend")
 }
 
 dependencies {

@@ -70,15 +70,17 @@ export function AppShell() {
           <AppBreadcrumbs />
           {lastBatch && (
             <div className="ml-auto flex items-center gap-1.5 rounded-full border border-border/50 bg-muted/50 px-2.5 py-1 text-xs shrink-0">
-              {lastBatch.failed > 0 ? (
+              {lastBatch.failed > 0 || lastBatch.cancelled > 0 ? (
                 <AlertCircle className="size-3 text-amber-400 shrink-0" />
               ) : (
                 <CheckCircle2 className="size-3 text-emerald-400 shrink-0" />
               )}
               <span className="text-muted-foreground tabular-nums">
                 {lastBatch.done > 0 && `${lastBatch.done} downloaded`}
-                {lastBatch.done > 0 && lastBatch.failed > 0 && " - "}
+                {lastBatch.done > 0 && (lastBatch.failed > 0 || lastBatch.cancelled > 0) && " - "}
                 {lastBatch.failed > 0 && `${lastBatch.failed} failed`}
+                {lastBatch.failed > 0 && lastBatch.cancelled > 0 && " - "}
+                {lastBatch.cancelled > 0 && `${lastBatch.cancelled} cancelled`}
               </span>
               <button
                 className="text-muted-foreground hover:text-foreground transition-colors ml-0.5"

@@ -1,4 +1,5 @@
 from datetime import datetime, timezone
+import logging
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from pathlib import Path
@@ -14,6 +15,7 @@ from app.services.download_queue import download_queue
 from app.models.source import SpotifyJson, SourceType, TrackState, TrackStatus
 
 router = APIRouter(prefix="/api/sources", tags=["sources"])
+logger = logging.getLogger(__name__)
 
 
 def _active_library():
@@ -26,12 +28,19 @@ def _active_library():
     return libs[0]
 
 
-def _source_folder_path(library_root: str, source_type: str, name: str, artist: str = "") -> Path:
+def _source_folder_path(
+    library_root: str, source_type: str, name: str, artist: str = "", spotify_id: str = ""
+) -> Path:
     if source_type == "playlist":
-        return playlists_dir(library_root) / source_folder(source_type, name, artist)
-    if source_type == "album":
-        return albums_dir(library_root) / source_folder(source_type, name, artist)
-    return tracks_dir(library_root)
+        folder = playlists_dir(library_root) / source_folder(source_type, name, artist)
+    elif source_type == "album":
+        folder = albums_dir(library_root) / source_folder(source_type, name, artist)
+    else:
+        return tracks_dir(library_root)
+    existing = load_state(folder)
+    if existing and spotify_id and existing.spotify_id != spotify_id:
+        return folder.with_name(f"{folder.name} ({spotify_id[:8]})")
+    return folder
 
 
 def _state_to_meta(folder: Path, state: SpotifyJson, active_jobs: dict[str, str] | None = None) -> dict:
@@ -94,14 +103,14 @@ async def resolve_url(body: ResolveRequest):
             return await audio_engine.resolve_user(body.url, sp_dc=cfg.sp_dc)
         data = await audio_engine.resolve_url(body.url)
     except Exception as exc:
-        print(f"[BACKEND] resolve failed for {body.url!r}: {exc}", flush=True)
+        logger.warning("Resolve failed for %r: %s", body.url, exc)
         raise HTTPException(400, str(exc))
 
     lib = _active_library()
     artist = ""
     if data["type"] == "album" and data.get("tracks"):
         artist = data["tracks"][0].get("album_artist", "")
-    folder = _source_folder_path(lib.root_path, data["type"], data["name"], artist)
+    folder = _source_folder_path(lib.root_path, data["type"], data["name"], artist, data["spotify_id"])
 
     if data["type"] == "track":
         folder = tracks_dir(lib.root_path)
@@ -134,7 +143,7 @@ async def add_source(body: AddSourceRequest):
     try:
         data = await audio_engine.resolve_url(body.url)
     except Exception as exc:
-        print(f"[BACKEND] add_source resolve failed for {body.url!r}: {exc}", flush=True)
+        logger.warning("Add-source resolve failed for %r: %s", body.url, exc)
         raise HTTPException(400, str(exc))
 
     if data["type"] == "track":
@@ -168,7 +177,7 @@ async def add_source(body: AddSourceRequest):
     if data["type"] == "album" and data.get("tracks"):
         artist = data["tracks"][0].get("album_artist", "")
 
-    folder = _source_folder_path(lib.root_path, data["type"], data["name"], artist)
+    folder = _source_folder_path(lib.root_path, data["type"], data["name"], artist, data["spotify_id"])
     folder.mkdir(parents=True, exist_ok=True)
 
     tracks = {

@@ -1,8 +1,9 @@
 import { api } from "./client";
-import type { DownloadJob } from "./types";
+import type { DownloadJob, DownloadSummary } from "./types";
 
 export const downloadsApi = {
   list: () => api.get<DownloadJob[]>("/downloads"),
+  summary: () => api.get<DownloadSummary>("/downloads/summary"),
   retry: (jobId: string) => api.post<DownloadJob>(`/downloads/${jobId}/retry`),
   retryWithUrl: (jobId: string, url: string) =>
     api.post<DownloadJob>(`/downloads/${jobId}/retry-with-url`, { url }),

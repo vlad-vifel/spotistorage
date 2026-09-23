@@ -1,16 +1,16 @@
 import { useDownloadSource, useRefreshSource, useDeleteSource } from "./useSources";
-import { useDownloads, useRetryAllFailed } from "./useDownloads";
+import { useDownloads } from "./useDownloads";
+import { useIsMutating } from "@tanstack/react-query";
 
 export function useSourceActions(sourceId: string) {
   const download = useDownloadSource();
   const refresh = useRefreshSource();
   const deleteSource = useDeleteSource();
-  const retryAll = useRetryAllFailed();
-  const { active, failed } = useDownloads();
+  const { active } = useDownloads();
+  const refreshAllPending = useIsMutating({ mutationKey: ["refresh-all"] }) > 0;
 
   const isDownloading = active.some((j) => j.source_id === sourceId);
-  const failedJobs = failed.filter((j) => j.source_id === sourceId);
-  const locked = isDownloading || download.isPending;
+  const locked = isDownloading || download.isPending || refreshAllPending;
 
-  return { download, refresh, deleteSource, retryAll, isDownloading, failedJobs, locked };
+  return { download, refresh, deleteSource, isDownloading, locked };
 }
