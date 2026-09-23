@@ -1,8 +1,9 @@
 import asyncio
+import subprocess
 import uuid
 from pathlib import Path
 from typing import Callable
-from app.core.paths import ffmpeg_location_env, resolve_quickjs_path
+from app.core.paths import ffmpeg_location_env, resolve_ffmpeg_paths, resolve_quickjs_path
 
 _DURATION_THRESHOLD = 10.0
 _YOUTUBE_HOSTS = ("youtube.com", "youtu.be")
@@ -36,6 +37,60 @@ def _is_deezer_url(url: str) -> bool:
     return "deezer.com" in url or "deezer.page.link" in url
 
 
+def _temp_media_files(output_dir: Path, temp_id: str) -> list[Path]:
+    return [
+        path for path in output_dir.glob(f"_dl_{temp_id}.*")
+        if path.is_file() and path.suffix not in {".mp3", ".part", ".ytdl"}
+    ]
+
+
+def _cleanup_temp_files(output_dir: Path, temp_id: str) -> None:
+    for path in output_dir.glob(f"_dl_{temp_id}.*"):
+        try:
+            path.unlink()
+        except OSError:
+            pass
+
+
+def _convert_to_mp3(output_dir: Path, temp_id: str, mp3_path: Path) -> None:
+    if mp3_path.exists() and mp3_path.stat().st_size >= 10_000:
+        return
+
+    inputs = _temp_media_files(output_dir, temp_id)
+    if not inputs:
+        raise RuntimeError("yt-dlp produced no media file")
+    input_path = max(inputs, key=lambda path: path.stat().st_mtime_ns)
+    ffmpeg_path, _ = resolve_ffmpeg_paths()
+    command = [
+        ffmpeg_path,
+        "-y",
+        "-i", str(input_path),
+        "-vn",
+        "-acodec", "libmp3lame",
+        "-b:a", "192k",
+        str(mp3_path),
+    ]
+    result = subprocess.run(
+        command,
+        stdin=subprocess.DEVNULL,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        check=False,
+    )
+    if result.returncode != 0:
+        details = [line.strip() for line in result.stderr.splitlines() if line.strip()]
+        detail = details[-1] if details else f"exit code {result.returncode}"
+        raise RuntimeError(f"FFmpeg conversion failed: {detail}")
+    if not mp3_path.exists() or mp3_path.stat().st_size < 10_000:
+        raise RuntimeError("FFmpeg produced an empty MP3")
+    for path in inputs:
+        try:
+            path.unlink()
+        except OSError:
+            pass
+
+
 def _base_ydl_opts(
     outtmpl: str,
     *,
@@ -46,11 +101,6 @@ def _base_ydl_opts(
     opts = {
         "format": "bestaudio/best",
         "outtmpl": outtmpl,
-        "postprocessors": [{
-            "key": "FFmpegExtractAudio",
-            "preferredcodec": "mp3",
-            "preferredquality": "192",
-        }],
         "js_runtimes": {"quickjs": {"path": resolve_quickjs_path()}},
         "extractor_args": {"youtube": {"player_client": ["mweb", "android", "web"]}},
         "retries": 10,
@@ -241,11 +291,12 @@ async def download_track(
                 try:
                     with yt_dlp.YoutubeDL(_ydl_opts(use_cookies)) as ydl:
                         ydl.download([direct_url])
+                    _convert_to_mp3(output_dir, temp_id, mp3_path)
                     return True
                 except Exception as dl_exc:
                     youtube_error = str(dl_exc)
                     print(f"[YT] Download error: {dl_exc}", flush=True)
-                    mp3_path.unlink(missing_ok=True)
+                    _cleanup_temp_files(output_dir, temp_id)
                     return False
 
             ok = _attempt(False)
@@ -257,7 +308,7 @@ async def download_track(
                 continue
 
             if not (mp3_path.exists() and mp3_path.stat().st_size >= 10_000):
-                mp3_path.unlink(missing_ok=True)
+                _cleanup_temp_files(output_dir, temp_id)
                 youtube_error = "downloaded file is empty"
                 continue
 
@@ -270,7 +321,7 @@ async def download_track(
 
             return mp3_path, {"source": "youtube", "bitrate_kbps": _mp3_bitrate_kbps(mp3_path)}
 
-        mp3_path.unlink(missing_ok=True)
+        _cleanup_temp_files(output_dir, temp_id)
         raise _combined_error(deezer_error, youtube_error, "yt-dlp did not find the track or ffmpeg is unavailable")
 
     return await asyncio.to_thread(_download)
@@ -333,16 +384,18 @@ async def download_from_url(
             try:
                 with yt_dlp.YoutubeDL(_ydl_opts(use_cookies)) as ydl:
                     ydl.download([url])
+                _convert_to_mp3(output_dir, temp_id, mp3_path)
                 if mp3_path.exists() and mp3_path.stat().st_size >= 10_000:
                     return mp3_path, {"source": "youtube", "bitrate_kbps": _mp3_bitrate_kbps(mp3_path)}
-                mp3_path.unlink(missing_ok=True)
+                _cleanup_temp_files(output_dir, temp_id)
                 last_error = RuntimeError("downloaded file is empty")
             except Exception as e:
                 last_error = e
+                _cleanup_temp_files(output_dir, temp_id)
                 if "Sign in to confirm your age" not in str(e):
                     break
 
-        mp3_path.unlink(missing_ok=True)
+        _cleanup_temp_files(output_dir, temp_id)
         raise RuntimeError(f"YouTube: {last_error}" if last_error else "YouTube download failed")
 
     return await asyncio.to_thread(_download)

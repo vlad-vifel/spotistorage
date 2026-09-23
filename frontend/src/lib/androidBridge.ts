@@ -3,6 +3,7 @@ export interface AndroidBridge {
   requestStoragePermission(): void;
   requestNotificationPermission(): void;
   checkNotificationPermission(): void;
+  startDownloadService(): void;
   getApiToken(): string;
 }
 
@@ -56,6 +57,10 @@ export function requestNotificationPermission(onResult: (granted: boolean) => vo
 export function checkNotificationPermission(onResult: (granted: boolean) => void): void {
   listenOnce("notifications", onResult);
   window.AndroidBridge?.checkNotificationPermission();
+}
+
+export function startDownloadService(): void {
+  window.AndroidBridge?.startDownloadService();
 }
 
 export function getApiToken(): string | null {

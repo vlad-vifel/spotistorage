@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { downloadsApi } from "../api/downloads";
 import { showError } from "@/lib/toast";
+import { startDownloadService } from "@/lib/androidBridge";
 
 export function useDownloads() {
   const { data: jobs = [] } = useQuery({
@@ -26,7 +27,10 @@ export function useRetryDownload() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (jobId: string) => downloadsApi.retry(jobId),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["downloads"] }),
+    onSuccess: () => {
+      startDownloadService();
+      qc.invalidateQueries({ queryKey: ["downloads"] });
+    },
     onError: (e) => showError(e, "Retry failed"),
   });
 }
@@ -35,7 +39,10 @@ export function useRetryWithUrl() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: ({ jobId, url }: { jobId: string; url: string }) => downloadsApi.retryWithUrl(jobId, url),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["downloads"] }),
+    onSuccess: () => {
+      startDownloadService();
+      qc.invalidateQueries({ queryKey: ["downloads"] });
+    },
     onError: (e) => showError(e, "Retry failed"),
   });
 }
@@ -44,7 +51,10 @@ export function useRetryAllFailed() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (jobIds: string[]) => Promise.all(jobIds.map((id) => downloadsApi.retry(id))),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["downloads"] }),
+    onSuccess: () => {
+      startDownloadService();
+      qc.invalidateQueries({ queryKey: ["downloads"] });
+    },
     onError: (e) => showError(e, "Retry failed"),
   });
 }

@@ -26,7 +26,7 @@ export function ResolvePreview({ result, onAdd, onAddAndDownload, pendingAction 
       contentClassName="md:p-5"
       artworkUrl={result.artwork_url}
       artworkName={result.name}
-      artworkClassName="object-cover shrink-0 max-md:size-20 max-md:rounded-md max-md:ring-1 max-md:ring-input md:size-36"
+      artworkClassName="object-cover shrink-0 max-md:size-20 max-md:rounded-md max-md:ring-1 max-md:ring-input md:size-40"
       artworkIconClassName="size-9"
       actions={
         result.already_in_library ? (

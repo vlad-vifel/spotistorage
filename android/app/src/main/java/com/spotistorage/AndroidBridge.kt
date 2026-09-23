@@ -25,5 +25,10 @@ class AndroidBridge(private val activity: MainActivity) {
     }
 
     @JavascriptInterface
+    fun startDownloadService() {
+        ServerForegroundService.start(activity.applicationContext)
+    }
+
+    @JavascriptInterface
     fun getApiToken(): String = PythonServerManager.apiToken
 }

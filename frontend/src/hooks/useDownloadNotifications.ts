@@ -3,6 +3,7 @@ import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { useDownloads } from "./useDownloads";
+import { isAndroid, startDownloadService } from "@/lib/androidBridge";
 
 export type LastBatch = { done: number; failed: number } | null;
 
@@ -19,6 +20,7 @@ export function useDownloadNotifications() {
 
     if (isActive && !wasActive) {
       setLastBatch(null);
+      if (isAndroid()) startDownloadService();
     }
 
     if (wasActive && !isActive) {

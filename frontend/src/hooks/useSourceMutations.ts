@@ -3,6 +3,7 @@ import { sourcesApi } from "../api/sources";
 import { downloadsApi } from "../api/downloads";
 import { showSuccess, showInfo, showWarning, showError } from "@/lib/toast";
 import { pluralize } from "@/lib/utils";
+import { startDownloadService } from "@/lib/androidBridge";
 import type { Source, TrackStatus } from "@/api/types";
 
 export function useAddSource() {
@@ -36,6 +37,7 @@ export function useDownloadSource() {
       return { prevSource, sourceId };
     },
     onSuccess: (result) => {
+      if (result.queued > 0) startDownloadService();
       if (result.queued === 0) showInfo("Everything is already downloaded");
       else showSuccess(`Queued ${pluralize(result.queued, "track")}`);
     },
@@ -108,6 +110,7 @@ export function useDownloadAllMissing() {
   return useMutation({
     mutationFn: () => sourcesApi.downloadAll(),
     onSuccess: (result) => {
+      if (result.queued > 0) startDownloadService();
       if (result.queued === 0) showInfo("Everything is already downloaded");
       else showSuccess(`Queued ${pluralize(result.queued, "track")}`);
       qc.invalidateQueries({ queryKey: ["downloads"] });
@@ -179,6 +182,9 @@ export function useDownloadSingleTrack() {
         };
       });
       return { prevSource, sourceId };
+    },
+    onSuccess: (result) => {
+      if (result.queued > 0) startDownloadService();
     },
     onError: (e, _, ctx) => {
       showError(e, "Track download failed");

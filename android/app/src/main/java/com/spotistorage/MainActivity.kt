@@ -68,7 +68,8 @@ class MainActivity : AppCompatActivity() {
         }
 
         pendingNavigation = intent?.getStringExtra(ServerForegroundService.EXTRA_NAVIGATE_TO)
-        ServerForegroundService.start(this)
+        ServerForegroundService.clearLegacySummary(applicationContext)
+        PythonServerManager.start(applicationContext)
         Thread({
             val ready = PythonServerManager.waitUntilReady()
             runOnUiThread {

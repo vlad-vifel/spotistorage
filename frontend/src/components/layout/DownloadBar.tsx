@@ -50,7 +50,7 @@ export function DownloadBar() {
 
       {isMobile && (
         <Sheet open={expanded} onOpenChange={setExpanded}>
-          <SheetContent side="bottom" className="h-[70svh] p-0 overflow-hidden [&>button]:hidden">
+          <SheetContent side="bottom" className="h-auto max-h-[70svh] p-0 overflow-hidden [&>button]:hidden">
             <DownloadPanel onClose={() => setExpanded(false)} />
           </SheetContent>
         </Sheet>

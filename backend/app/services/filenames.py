@@ -18,7 +18,7 @@ def sanitize(name: str) -> str:
 
 
 def track_filename(position: int, artists: list[str], title: str) -> str:
-    pos = f"{position:02d}"
+    pos = f"{position:03d}"
     art = sanitize(", ".join(artists))
     tit = sanitize(title)
     return f"{pos} - {art} - {tit}.mp3"

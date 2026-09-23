@@ -1,6 +1,8 @@
 from datetime import datetime, timezone
 from pathlib import Path
 import os
+import re
+import uuid
 from app.services import audio_engine
 from app.services.state_store import save_state, sync_file_existence
 from app.services.filenames import track_filename
@@ -62,11 +64,12 @@ def _apply_refresh(folder: Path, state: SpotifyJson, resolved: dict) -> tuple[Sp
 
     renamed = 0
     if state.type.value in ("playlist", "album"):
-        renamed = _rename_repositioned_tracks(folder, state, resolved_by_id)
+        renamed = _normalize_track_filenames(folder, state)
 
     state.last_refreshed = datetime.now(timezone.utc).isoformat()
     save_state(folder, state)
     state = sync_file_existence(folder, state)
+    save_state(folder, state)
     wrong = _check_track_durations(folder, state)
     if wrong > 0:
         save_state(folder, state)
@@ -111,37 +114,58 @@ def _check_track_durations(folder: Path, state: SpotifyJson) -> int:
     return flagged
 
 
-def _rename_repositioned_tracks(
-    folder: Path,
-    state: SpotifyJson,
-    resolved_by_id: dict[str, dict],
-) -> int:
+def _normalize_track_filenames(folder: Path, state: SpotifyJson) -> int:
     to_rename = []
+    state_only_updates: list[tuple[str, str]] = []
     for tid, t in state.tracks.items():
-        if not t.file or tid not in resolved_by_id:
+        if not t.file:
             continue
-        rt = resolved_by_id[tid]
-        new_pos = rt.get("track_number")
-        if new_pos is None or t.position == new_pos:
+        new_name = _normalized_track_name(t)
+        if not new_name or t.file == new_name:
             continue
-        artists = rt.get("artists") or ([t.artist] if t.artist else ["Unknown"])
-        new_name = track_filename(new_pos, artists, t.title or "")
         old_path = folder / t.file
-        if old_path.exists() and t.file != new_name:
-            to_rename.append((tid, old_path, folder / new_name, new_name, new_pos))
+        new_path = folder / new_name
+        if old_path.exists():
+            to_rename.append((tid, old_path, new_path, new_name))
+        elif new_path.exists():
+            state_only_updates.append((tid, new_name))
 
+    for tid, new_name in state_only_updates:
+        state.tracks[tid].file = new_name
+
+    renamed = len(state_only_updates)
     if not to_rename:
-        return 0
+        return renamed
+
+    old_paths = {old_path for _, old_path, _, _ in to_rename}
+    safe_to_rename = [
+        item for item in to_rename
+        if not item[2].exists() or item[2] in old_paths
+    ]
+    if not safe_to_rename:
+        return renamed
 
     tmp_paths: list[Path] = []
-    for _, old_path, _, _, new_pos in to_rename:
-        tmp_path = folder / f".tmp-track-{new_pos:03d}.mp3"
+    for _, old_path, _, _ in safe_to_rename:
+        tmp_path = folder / f".tmp-track-normalize-{uuid.uuid4().hex}.mp3"
         os.replace(old_path, tmp_path)
         tmp_paths.append(tmp_path)
 
-    for i, (tid, _, final_path, new_name, new_pos) in enumerate(to_rename):
+    for i, (tid, _, final_path, new_name) in enumerate(safe_to_rename):
         os.replace(tmp_paths[i], final_path)
         state.tracks[tid].file = new_name
-        state.tracks[tid].position = new_pos
 
-    return len(to_rename)
+    return renamed + len(safe_to_rename)
+
+
+def _normalized_track_name(track: TrackState) -> str | None:
+    if track.position and track.title and track.artist:
+        artists = [artist.strip() for artist in track.artist.split(",") if artist.strip()]
+        return track_filename(track.position, artists, track.title)
+
+    if not track.file:
+        return None
+    match = re.match(r"^(\d+)(\s+-\s+.*)$", Path(track.file).name)
+    if not match:
+        return None
+    return f"{int(match.group(1)):03d}{match.group(2)}"

@@ -28,9 +28,11 @@ export function StepDeps({ onBack, onNext }: Props) {
       <div className="flex items-center justify-between pt-2">
         <Button variant="ghost" size="sm" onClick={onBack} disabled={completeSetup.isPending}>Back</Button>
         <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={finish} disabled={completeSetup.isPending}>
-            Skip for now
-          </Button>
+          {!deps?.all_ok && (
+            <Button variant="outline" size="sm" onClick={finish} disabled={completeSetup.isPending}>
+              Skip for now
+            </Button>
+          )}
           <Button size="sm" disabled={!deps?.all_ok || completeSetup.isPending} onClick={finish}>
             Continue
           </Button>
