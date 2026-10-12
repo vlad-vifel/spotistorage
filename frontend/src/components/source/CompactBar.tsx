@@ -1,10 +1,13 @@
-import { Download, Loader2, RefreshCw, Trash2 } from "lucide-react";
+import { Download, Eraser, Loader2, RefreshCw, Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { SourceArtwork } from "@/components/common/SourceArtwork";
 import { DeleteSourceDialog } from "./DeleteSourceDialog";
+import { DeleteRemovedDialog } from "./DeleteRemovedDialog";
 import { useSourceActions } from "@/hooks/useSourceActions";
 import { useDeleteSourceFlow } from "@/hooks/useDeleteSourceFlow";
+import { useDeleteRemovedFlow } from "@/hooks/useDeleteRemovedFlow";
 import { getSourceBadgeVariant, getMissingCount } from "@/lib/status";
 import { capitalize, cn } from "@/lib/utils";
 import type { Source, RefreshResult } from "@/api/types";
@@ -18,6 +21,7 @@ interface Props {
 export function CompactBar({ compact, source, onRefreshed }: Props) {
   const actions = useSourceActions(source.id);
   const deleteFlow = useDeleteSourceFlow(source, actions.deleteSource, { navigateAway: true });
+  const removedFlow = useDeleteRemovedFlow(source);
   const missing = getMissingCount(source);
   const badgeVariant = getSourceBadgeVariant(source.downloaded_tracks, source.total_tracks);
   const typeLabel = capitalize(source.type);
@@ -37,15 +41,6 @@ export function CompactBar({ compact, source, onRefreshed }: Props) {
           {source.downloaded_tracks}/{source.total_tracks}
         </Badge>
         <div className="flex items-center gap-1.5 shrink-0">
-          <Button
-            variant="outline"
-            size="icon-sm"
-            onClick={() => actions.refresh.mutate(source.id, { onSuccess: onRefreshed })}
-            disabled={actions.refresh.isPending || actions.locked}
-            aria-label="Refresh"
-          >
-            <RefreshCw className={cn("size-3.5", actions.refresh.isPending && "animate-spin")} />
-          </Button>
           {(missing > 0 || actions.isDownloading) && (
             <Button
               size="icon-sm"
@@ -58,6 +53,31 @@ export function CompactBar({ compact, source, onRefreshed }: Props) {
                 : <Download className="size-3.5" />}
             </Button>
           )}
+          {removedFlow.count > 0 && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="icon-sm"
+                  onClick={removedFlow.openDialog}
+                  disabled={actions.locked}
+                  aria-label="Delete removed tracks"
+                >
+                  <Eraser className="size-3.5" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Delete removed ({removedFlow.count})</TooltipContent>
+            </Tooltip>
+          )}
+          <Button
+            variant="outline"
+            size="icon-sm"
+            onClick={() => actions.refresh.mutate(source.id, { onSuccess: onRefreshed })}
+            disabled={actions.refresh.isPending || actions.locked}
+            aria-label="Refresh"
+          >
+            <RefreshCw className={cn("size-3.5", actions.refresh.isPending && "animate-spin")} />
+          </Button>
           <Button
             variant="destructive"
             size="icon-sm"
@@ -76,6 +96,14 @@ export function CompactBar({ compact, source, onRefreshed }: Props) {
         onOpenChange={deleteFlow.setOpen}
         onConfirm={deleteFlow.confirm}
         isPending={actions.deleteSource.isPending}
+      />
+      <DeleteRemovedDialog
+        count={removedFlow.count}
+        scope={`"${source.name}"`}
+        open={removedFlow.open}
+        onOpenChange={removedFlow.setOpen}
+        onConfirm={removedFlow.confirm}
+        isPending={removedFlow.isPending}
       />
     </>
   );

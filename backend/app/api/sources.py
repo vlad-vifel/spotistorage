@@ -216,6 +216,50 @@ async def list_sources():
     return [_state_to_meta(folder, state) for folder, state in results]
 
 
+async def _delete_removed_tracks(folder: Path) -> int:
+    async with get_state_lock(folder):
+        state = load_state(folder)
+        if state is None:
+            return 0
+        removed_ids = [
+            tid for tid, t in state.tracks.items()
+            if t.status == TrackStatus.removed_from_source
+        ]
+        for tid in removed_ids:
+            track = state.tracks[tid]
+            if track.file:
+                f = folder / track.file
+                if f.exists():
+                    f.unlink()
+            del state.tracks[tid]
+        if removed_ids:
+            save_state(folder, state)
+        return len(removed_ids)
+
+
+@router.post("/delete-removed")
+async def delete_removed_tracks_all():
+    lib = _active_library()
+    deleted = 0
+    sources = 0
+    for folder, _ in scan_library(lib.root_path):
+        count = await _delete_removed_tracks(folder)
+        if count:
+            deleted += count
+            sources += 1
+    return {"deleted": deleted, "sources": sources}
+
+
+@router.post("/{source_id}/delete-removed")
+async def delete_removed_tracks(source_id: str):
+    lib = _active_library()
+    found = find_source(lib.root_path, source_id)
+    if not found:
+        raise HTTPException(404, "Source not found")
+    folder, _ = found
+    return {"deleted": await _delete_removed_tracks(folder), "sources": 1}
+
+
 @router.get("/{source_id}")
 async def get_source(source_id: str):
     lib = _active_library()

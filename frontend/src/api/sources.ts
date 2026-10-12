@@ -1,5 +1,5 @@
 import { api } from "./client";
-import type { Source, AnyResolveResult, QueuedResult, RefreshResult, RefreshAllResult } from "./types";
+import type { Source, AnyResolveResult, QueuedResult, RefreshResult, RefreshAllResult, DeleteRemovedResult } from "./types";
 
 export const sourcesApi = {
   list: () => api.get<Source[]>("/sources"),
@@ -11,5 +11,7 @@ export const sourcesApi = {
   refresh: (id: string) => api.post<RefreshResult>(`/sources/${id}/refresh`),
   refreshAll: () => api.post<RefreshAllResult>("/sources/refresh-all"),
   delete: (id: string) => api.delete(`/sources/${id}`),
+  deleteRemoved: (id: string) => api.post<DeleteRemovedResult>(`/sources/${id}/delete-removed`),
+  deleteRemovedAll: () => api.post<DeleteRemovedResult>("/sources/delete-removed"),
   deleteTrack: (sourceId: string, trackId: string) => api.delete(`/sources/${sourceId}/tracks/${trackId}`),
 };

@@ -33,6 +33,11 @@ export interface Source {
   tracks?: TrackInfo[];
 }
 
+export interface DeleteRemovedResult {
+  deleted: number;
+  sources: number;
+}
+
 export interface SpotifyTrackMeta {
   id: string;
   title: string;

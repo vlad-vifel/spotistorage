@@ -92,7 +92,7 @@ Primary key: **Spotify Track ID**. Each `.spotify.json` maps track IDs → local
 
 **Refresh** (user-triggered, single source or all): re-fetch Spotify source → compare track IDs → show new/downloaded/removed counts → re-check downloaded files' durations (flags `wrong_track`) → download only missing.
 **Filesystem scan** (startup + every list/get request): check which local files exist, update state. Don't re-fetch Spotify on every scan — only an explicit refresh talks to Spotify.
-**Removed tracks**: never auto-delete. Inform user, keep local files.
+**Removed tracks**: never auto-delete. Inform user, keep local files. The user can explicitly delete them (with a confirm dialog) per source or library-wide via `delete-removed` – this removes the MP3s and their `.spotify.json` entries.
 **Reordering**: rename via temp files (`.tmp-track-NNN.mp3`) to avoid collisions.
 **Duplicates across playlists**: intentional physical copies — no dedup system.
 **Concurrency**: writes to a source's `.spotify.json` (delete/add/download-complete/refresh) are serialized per-folder via an `asyncio.Lock` (`core/state_locks.py`). Routes that can trigger a state write must be `async def`, not plain `def` — FastAPI runs sync `def` routes in a threadpool thread, which the lock cannot protect against.
@@ -151,8 +151,8 @@ Always reach for an existing `components/ui/` primitive (or add one via shadcn c
 - **No `.tsx` files in `src/` root** except `main.tsx` and `App.tsx`. All components live in semantic subfolders:
   - `components/layout/` — AppShell, AppSidebar, BottomNav (mobile-only nav, same `navItems.ts` as the sidebar), NavErrorBadge, DownloadBar, DownloadPanel
   - `components/url/` — ResolvePreview, UserProfilePreview
-  - `components/library/` — SourceList, SourceCard
-  - `components/source/` — SourceHeader, CompactBar, SourceActions, TrackTable, TrackTableHeader, TrackRow, TrackStatusBadge, RefreshBanner, DeleteSourceDialog, TrackDeleteDialog, `trackColumns.ts` (shared column-width classes between the header and rows)
+  - `components/library/` — SourceList, SourceCard, LibraryHeader
+  - `components/source/` — SourceHeader, CompactBar, SourceActions, TrackTable, TrackTableHeader, TrackRow, TrackStatusBadge, RefreshBanner, DeleteSourceDialog, DeleteRemovedDialog, TrackDeleteDialog, SourceBadges, `trackColumns.ts` (shared column-width classes between the header and rows)
   - `components/errors/` — ErrorRow
   - `components/settings/` — LibraryPathSetting, DeleteLibraryDialog, SpotifyCookieSetting, DeezerArlSetting, YoutubeCookiesSetting (+ its three mode components: `YoutubeCookiesBrowserMode`/`FileMode`/`PasteMode`), SecretCookieSetting (shared by the two cookie settings), DependencyStatus, NotificationPermissionSetting (Android only)
   - `components/setup/` — SetupWizard, StepWelcome, StepPermissions (Android only), StepFolder, StepDeps
@@ -181,7 +181,8 @@ POST     /api/sources/resolve, POST /api/sources
 GET      /api/sources, /api/sources/{id}
 DELETE   /api/sources/{id}, /api/sources/{id}/tracks/{track_id}
 POST     /api/sources/{id}/download, /api/sources/{id}/refresh
-POST     /api/sources/refresh-all, /api/sources/download-all
+POST     /api/sources/refresh-all, /api/sources/download-all, /api/sources/delete-removed
+POST     /api/sources/{id}/delete-removed
 POST     /api/sources/{id}/tracks/{track_id}/download
 GET      /api/downloads
 POST     /api/downloads/{id}/retry, /api/downloads/{id}/retry-with-url
@@ -212,6 +213,18 @@ Only `feat:` or `fix:` prefix. English, ~10 words max, no AI attribution.
 ```
 feat: add playlist synchronization
 fix: prevent duplicate downloads
+```
+
+## Release Notes
+
+Each release has a notes file at `.github/release-notes/v{version}.md` (the Android release workflow publishes it as the GitHub Release body). Bump the version in the same change: `package.json`, `frontend/package.json`, both `package-lock.json` files, `backend/pyproject.toml`, `backend/uv.lock`, and `android/app/build.gradle.kts` (`versionName` + increment `versionCode`).
+
+Rules: English, no title/heading line – start straight with a bold section label, then a short bullet list. One line per change, user-facing wording (what changed for the user, not how), no implementation details or file names. Keep it brief – a small release can be 1–3 bullets. Use only the sections that apply, in this order: `**Features**`, `**Fixes & improvements**`. En-dash (–), not em-dash.
+
+```markdown
+**Fixes & improvements**
+- Downloads on Android now continue in the background when the screen is off
+- The Android app now shows system notifications with download progress and a completion summary, tapping a notification opens the relevant page in the app
 ```
 
 ## MVP Done When

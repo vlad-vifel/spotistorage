@@ -47,7 +47,7 @@ export function ErrorRow({ job, sourceName }: { job: DownloadJob; sourceName: st
           </p>
         </div>
 
-        <div className="hidden md:flex items-center gap-2 flex-wrap" onClick={(e) => e.stopPropagation()}>
+        <div className="hidden lg:flex items-center gap-2 shrink-0" onClick={(e) => e.stopPropagation()}>
           {job.error && (
             <Button variant="ghost" size="sm" onClick={() => setExpanded((v) => !v)}>
               {expanded ? <ChevronUp className="size-3.5" /> : <ChevronDown className="size-3.5" />}
@@ -79,7 +79,7 @@ export function ErrorRow({ job, sourceName }: { job: DownloadJob; sourceName: st
           </Button>
         </div>
 
-        <div className="md:hidden" onClick={(e) => e.stopPropagation()}>
+        <div className="lg:hidden" onClick={(e) => e.stopPropagation()}>
           <ActionMenu
             label="Track actions"
             items={[

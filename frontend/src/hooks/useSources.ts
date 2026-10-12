@@ -10,3 +10,4 @@ export {
   useDeleteTrack,
   useDownloadSingleTrack,
 } from "./useSourceMutations";
+export { useDeleteRemovedTracks, useDeleteAllRemovedTracks } from "./useRemovedTracksMutations";

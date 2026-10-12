@@ -96,7 +96,7 @@ export function AppShell() {
           data-scroll-root
           className="flex-1 min-h-0 overflow-y-auto max-md:overflow-x-hidden md:[scrollbar-gutter:stable]"
         >
-          <div className="px-4 sm:px-6">
+          <div className="mx-auto w-full max-w-6xl px-4 sm:px-6">
             <Outlet />
           </div>
         </div>

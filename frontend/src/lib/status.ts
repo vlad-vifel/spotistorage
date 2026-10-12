@@ -14,3 +14,7 @@ export function getMissingCount(source: Source): number {
     ? source.tracks.filter((t) => t.status === "missing" || t.status === "wrong_track").length
     : Math.max(0, source.total_tracks - source.downloaded_tracks);
 }
+
+export function getRemovedCount(source: Source): number {
+  return source.tracks?.filter((t) => t.status === "removed_from_source").length ?? 0;
+}

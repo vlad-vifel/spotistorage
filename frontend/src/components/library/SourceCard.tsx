@@ -4,8 +4,7 @@ import { useDeleteSourceFlow } from "@/hooks/useDeleteSourceFlow";
 import { DeleteSourceDialog } from "@/components/source/DeleteSourceDialog";
 import { SourceActions } from "@/components/source/SourceActions";
 import { MediaCard } from "@/components/common/MediaCard";
-import { Badge } from "@/components/ui/badge";
-import { getSourceBadgeVariant } from "@/lib/status";
+import { SourceBadges } from "@/components/source/SourceBadges";
 import { formatLocalTime } from "@/lib/utils";
 import type { Source } from "@/api/types";
 
@@ -16,7 +15,6 @@ interface Props {
 export function SourceCard({ source }: Props) {
   const actions = useSourceActions(source.id);
   const deleteFlow = useDeleteSourceFlow(source, actions.deleteSource);
-  const badgeVariant = getSourceBadgeVariant(source.downloaded_tracks, source.total_tracks);
 
   return (
     <>
@@ -31,7 +29,7 @@ export function SourceCard({ source }: Props) {
           <SourceActions
             source={source}
             actions={actions}
-            size="xs"
+            variant="card"
             onDeleteClick={deleteFlow.openDelete}
           />
         }
@@ -46,9 +44,7 @@ export function SourceCard({ source }: Props) {
             )}
           </div>
           <p className="font-semibold truncate mt-0.5">{source.name}</p>
-          <Badge variant={badgeVariant} className="w-fit flex items-center gap-2 mt-1.5">
-            {source.downloaded_tracks}/{source.total_tracks} downloaded
-          </Badge>
+          <SourceBadges source={source} className="mt-1.5" />
         </Link>
       </MediaCard>
 

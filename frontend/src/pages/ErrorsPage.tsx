@@ -29,7 +29,7 @@ export function ErrorsPage() {
 
   return (
     <div className="flex flex-col gap-4 pt-6 pb-6">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
         <div className="min-w-0">
           <h2 className="text-xl font-semibold">Failed downloads</h2>
           <p className="text-sm text-muted-foreground mt-0.5">
