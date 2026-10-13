@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { configApi } from "../api/config";
 import { showError } from "@/lib/toast";
-import type { AppConfig } from "../api/types";
+import type { AppConfig, CloseAction } from "../api/types";
 
 export function useConfig() {
   return useQuery({ queryKey: ["config"], queryFn: configApi.get });
@@ -44,6 +44,15 @@ export function useUpdateDeezerArl() {
     mutationFn: (deezer_arl: string | null) => configApi.updateDeezerArl(deezer_arl),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["config"] }),
     onError: (e) => showError(e, "Failed to save Deezer ARL"),
+  });
+}
+
+export function useUpdateCloseAction() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (closeAction: CloseAction) => configApi.updateCloseAction(closeAction),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["config"] }),
+    onError: (e) => showError(e, "Failed to save window setting"),
   });
 }
 

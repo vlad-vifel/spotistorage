@@ -1,4 +1,4 @@
-name: Android Release
+name: Release
 
 on:
   push:
@@ -14,7 +14,22 @@ permissions:
   contents: write
 
 jobs:
-  build:
+  version:
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.version.outputs.tag }}
+    steps:
+      - name: Resolve version tag
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "tag=${{ inputs.version }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "tag=${{ github.ref_name }}" >> "$GITHUB_OUTPUT"
+          fi
+
+  android:
+    needs: version
     runs-on: windows-latest
 
     steps:
@@ -69,28 +84,65 @@ jobs:
           ANDROID_SIGNING_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: .\gradlew.bat assembleRelease --no-daemon
 
-      - name: Resolve version tag
-        id: version
-        shell: bash
-        run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "tag=${{ inputs.version }}" >> "$GITHUB_OUTPUT"
-          else
-            echo "tag=${{ github.ref_name }}" >> "$GITHUB_OUTPUT"
-          fi
-
       - name: Rename APK
         shell: bash
         run: |
           mkdir -p dist
           cp android/app/build/outputs/apk/release/app-release.apk \
-             "dist/SpotiStorage-${{ steps.version.outputs.tag }}.apk"
+             "dist/SpotiStorage-${{ needs.version.outputs.tag }}.apk"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: android
+          path: dist/*.apk
+          if-no-files-found: error
+
+  windows:
+    needs: version
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - uses: astral-sh/setup-uv@v3
+
+      - name: Install Inno Setup
+        shell: pwsh
+        run: |
+          if (-not (Test-Path "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe")) {
+            choco install innosetup --no-progress -y
+          }
+
+      - name: Build Windows installer
+        shell: pwsh
+        run: .\desktop\build.ps1 -Version "${{ needs.version.outputs.tag }}"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows
+          path: desktop/dist/SpotiStorage-Setup-*.exe
+          if-no-files-found: error
+
+  release:
+    needs: [version, android, windows]
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
 
       - name: Resolve release notes
         id: notes
-        shell: bash
         run: |
-          f=".github/release-notes/${{ steps.version.outputs.tag }}.md"
+          f=".github/release-notes/${{ needs.version.outputs.tag }}.md"
           if [ -f "$f" ]; then
             echo "path=$f" >> "$GITHUB_OUTPUT"
             echo "auto=false" >> "$GITHUB_OUTPUT"
@@ -102,8 +154,10 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ steps.version.outputs.tag }}
-          name: ${{ steps.version.outputs.tag }}
-          files: dist/*.apk
+          tag_name: ${{ needs.version.outputs.tag }}
+          name: ${{ needs.version.outputs.tag }}
+          files: |
+            dist/*.apk
+            dist/*.exe
           body_path: ${{ steps.notes.outputs.path }}
           generate_release_notes: ${{ steps.notes.outputs.auto }}

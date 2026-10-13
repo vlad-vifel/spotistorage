@@ -5,7 +5,10 @@ import { SpotifyCookieSetting } from "@/components/settings/SpotifyCookieSetting
 import { YoutubeCookiesSetting } from "@/components/settings/YoutubeCookiesSetting";
 import { DeezerArlSetting } from "@/components/settings/DeezerArlSetting";
 import { NotificationPermissionSetting } from "@/components/settings/NotificationPermissionSetting";
+import { CloseBehaviorSetting } from "@/components/settings/CloseBehaviorSetting";
+import { UpdateBanner } from "@/components/settings/UpdateBanner";
 import { isAndroid } from "@/lib/androidBridge";
+import { useIsDesktopApp } from "@/hooks/useIsDesktopApp";
 
 function SettingsSection({ title, description, children }: {
   title: string;
@@ -26,12 +29,16 @@ function SettingsSection({ title, description, children }: {
 }
 
 export function SettingsPage() {
+  const isDesktopApp = useIsDesktopApp();
+
   return (
     <div className="max-w-lg flex flex-col gap-4 pt-6 pb-6">
       <div className="mb-2">
         <h2 className="text-xl font-semibold">Settings</h2>
         <p className="text-sm text-muted-foreground mt-0.5">Manage your libraries and dependencies</p>
       </div>
+
+      <UpdateBanner />
 
       <SettingsSection
         title="Music libraries"
@@ -67,9 +74,17 @@ export function SettingsPage() {
         </SettingsSection>
       )}
 
+      {isDesktopApp && (
+        <SettingsSection title="Window" description="What happens when you close the SpotiStorage window.">
+          <CloseBehaviorSetting />
+        </SettingsSection>
+      )}
+
       <SettingsSection
         title="System dependencies"
-        description="Required external tools. Install them manually – the app never modifies your system."
+        description={isDesktopApp
+          ? "External tools bundled with the app."
+          : "Required external tools. Install them manually – the app never modifies your system."}
       >
         <DependencyStatus />
       </SettingsSection>

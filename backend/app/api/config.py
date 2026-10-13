@@ -1,5 +1,6 @@
 import os
 from pathlib import Path
+from typing import Literal
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from app.core.atomic_write import write_text_atomic
@@ -98,10 +99,26 @@ def update_deezer_arl(body: DeezerArlRequest):
     return {"ok": True}
 
 
+class CloseActionRequest(BaseModel):
+    close_action: Literal["quit", "tray"]
+
+
+@router.put("/close-action")
+def update_close_action(body: CloseActionRequest):
+    cfg = load_config()
+    cfg = model_copy(cfg, {"close_action": body.close_action})
+    save_config(cfg)
+    return {"ok": True}
+
+
+def _ensure_tk_dialogs_available() -> None:
+    if os.environ.get("SPOTISTORAGE_PLATFORM") in ("android", "windows"):
+        raise HTTPException(status_code=400, detail="Not available on this platform – use the native picker instead")
+
+
 @router.get("/browse-folder")
 def browse_folder():
-    if os.environ.get("SPOTISTORAGE_PLATFORM") == "android":
-        raise HTTPException(status_code=400, detail="Not available on Android — use the folder picker instead")
+    _ensure_tk_dialogs_available()
     try:
         import tkinter as tk
         from tkinter import filedialog
@@ -117,8 +134,7 @@ def browse_folder():
 
 @router.get("/browse-file")
 def browse_file():
-    if os.environ.get("SPOTISTORAGE_PLATFORM") == "android":
-        raise HTTPException(status_code=400, detail="Not available on Android — paste the file's content instead")
+    _ensure_tk_dialogs_available()
     try:
         import tkinter as tk
         from tkinter import filedialog

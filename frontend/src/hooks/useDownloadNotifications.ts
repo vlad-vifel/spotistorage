@@ -23,6 +23,8 @@ export function useDownloadNotifications() {
 
     if (wasActive && !isActive) {
       qc.invalidateQueries({ queryKey: ["sources"] });
+      qc.invalidateQueries({ queryKey: ["source"] });
+      qc.invalidateQueries({ queryKey: ["downloads"] });
       const doneCount = summary?.done ?? 0;
       const failedCount = summary?.failed ?? 0;
       const cancelledCount = summary?.cancelled ?? 0;

@@ -120,7 +120,17 @@ export interface AppConfig {
   youtube_cookies_content?: string | null;
   youtube_browser?: string | null;
   deezer_arl?: string | null;
+  close_action?: CloseAction;
   platform?: string;
+}
+
+export type CloseAction = "quit" | "tray";
+
+export interface AppUpdateInfo {
+  current_version: string | null;
+  latest_version: string | null;
+  update_available: boolean;
+  release_url: string;
 }
 
 export interface DepsStatus {

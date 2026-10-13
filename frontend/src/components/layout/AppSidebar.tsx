@@ -1,10 +1,10 @@
 import { useLocation, Link } from "react-router-dom";
-import { Music2 } from "lucide-react";
 import {
   Sidebar, SidebarContent, SidebarGroup,
   SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem,
 } from "@/components/ui/sidebar";
 import { useDownloads } from "@/hooks/useDownloads";
+import { Logo } from "@/components/common/Logo";
 import { NAV_ITEMS, isNavActive } from "./navItems";
 import { NavErrorBadge } from "./NavErrorBadge";
 
@@ -16,7 +16,7 @@ export function AppSidebar() {
     <Sidebar variant="inset">
       <SidebarHeader>
         <Link to="/add" className="flex items-center gap-2 px-2 py-1">
-          <Music2 className="size-5 text-foreground" />
+          <Logo className="size-6" />
           <span className="font-semibold text-sm text-foreground">SpotiStorage</span>
         </Link>
       </SidebarHeader>

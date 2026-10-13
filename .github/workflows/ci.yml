@@ -40,3 +40,25 @@ jobs:
       - name: Compile Android app
         working-directory: android
         run: .\gradlew.bat :app:assembleDebug --no-daemon --console=plain
+
+  desktop:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - uses: astral-sh/setup-uv@v3
+
+      - name: Install Inno Setup
+        shell: pwsh
+        run: |
+          if (-not (Test-Path "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe")) {
+            choco install innosetup --no-progress -y
+          }
+
+      - name: Package Windows app, run self-test and build installer
+        shell: pwsh
+        run: .\desktop\build.ps1

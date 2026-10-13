@@ -1,5 +1,5 @@
 import { api } from "./client";
-import type { AppConfig, Library, DepsStatus } from "./types";
+import type { AppConfig, AppUpdateInfo, CloseAction, Library, DepsStatus } from "./types";
 
 export const configApi = {
   get: () => api.get<AppConfig>("/config"),
@@ -11,6 +11,8 @@ export const configApi = {
     youtube_cookies_text?: string | null;
   }) => api.put<void>("/config/youtube-cookies", params),
   updateDeezerArl: (deezer_arl: string | null) => api.put<void>("/config/deezer-arl", { deezer_arl }),
+  updateCloseAction: (close_action: CloseAction) => api.put<void>("/config/close-action", { close_action }),
+  getAppUpdate: () => api.get<AppUpdateInfo>("/app/update"),
   completeSetup: () => api.put<void>("/config/complete-setup", {}),
   getDeps: () => api.get<DepsStatus>("/dependencies"),
   createLibrary: (name: string, root_path: string) =>

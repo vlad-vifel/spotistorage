@@ -129,7 +129,7 @@ def _fetch_track(
     stream_url, fmt = _get_stream_url(opener, license_token, track_token)
 
     req = urllib.request.Request(stream_url, headers={"User-Agent": _USER_AGENT})
-    with opener.open(req, timeout=120) as r:
+    with opener.open(req, timeout=30) as r:
         raw = r.read()
 
     decrypted = _decrypt(raw, track_id)

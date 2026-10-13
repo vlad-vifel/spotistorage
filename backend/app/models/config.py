@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field
-from typing import Optional
+from typing import Literal, Optional
 import uuid
 
 
@@ -17,6 +17,7 @@ class AppConfig(BaseModel):
     youtube_cookies_path: Optional[str] = None
     youtube_browser: Optional[str] = None
     deezer_arl: Optional[str] = None
+    close_action: Literal["quit", "tray"] = "quit"
 
 
 class AppConfigResponse(AppConfig):

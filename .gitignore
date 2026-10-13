@@ -23,3 +23,6 @@ android/.idea/
 android/*.iml
 android/captures/
 
+
+# Desktop build output
+desktop/build/

@@ -18,6 +18,7 @@ Local-only web app: paste Spotify URL (playlist/album/track/user profile) → de
 - **Download queue:** SQLite via aiosqlite — ephemeral job state only, NOT library state (library state lives in `.spotify.json` files)
 - **External deps:** FFmpeg (must be in PATH on desktop), a JS runtime for YouTube's player challenge (QuickJS-NG, bundled in `backend/bin/` on desktop). All Python packages including yt-dlp are managed by uv. Detect missing deps at startup (`services/deps_check.py`, `GET /api/dependencies`), never silently install.
 - **Android (optional):** a thin Kotlin WebView wrapper (`android/`) around the *same* FastAPI backend, run in-process via Chaquopy's embedded CPython. See "Android App" below — it's a packaging concern only, not a second implementation.
+- **Windows app (optional):** a pywebview (WebView2) + pystray shell (`desktop/`) around the *same* FastAPI backend, packaged with PyInstaller + Inno Setup. See "Windows App" below — also a packaging concern only.
 
 ## Non-Goals
 
@@ -52,6 +53,7 @@ spotistorage/
 │   │                     # shim — Android's Chaquopy runs pydantic v1, no Rust wheel available there)
 │   └── bin/qjs.exe      # Bundled QuickJS-NG binary (desktop only — Android bundles its own in jniLibs)
 ├── android/           # Optional Kotlin WebView wrapper — see "Android App" below
+├── desktop/           # Optional Windows app shell + build scripts — see "Windows App" below
 ├── config/user.json   # User config incl. secrets (git-ignored)
 ├── config/jobs.db      # Ephemeral download queue (git-ignored, cleared on restart)
 ├── package.json       # Root: concurrently runs both
@@ -99,7 +101,7 @@ Primary key: **Spotify Track ID**. Each `.spotify.json` maps track IDs → local
 
 ## Downloads
 
-Async queue, concurrency locked at 1 (misbehaves with concurrent downloads on either Deezer or yt-dlp; increasing concurrency is planned). Flow per track: try Deezer (if ARL configured) → fall back to yt-dlp/YouTube search + duration/keyword ranking → verify file size + duration → embed metadata/artwork via Mutagen → rename to final. Failed tracks don't abort the batch; user can retry individually or retry with a manually-supplied Deezer/YouTube URL (bypasses search entirely). Auto-retry up to 5 times with exponential backoff for transient failures (duration mismatch / "track not found" are treated as permanent, no auto-retry). Queue state persists in SQLite (`config/jobs.db`) and is cleared on server restart (queued items dropped, failed items retained for display). Bulk refresh-all/download-all resolve against Spotify with bounded concurrency (a semaphore), not fully sequential or fully parallel.
+Async queue, concurrency locked at 1 (misbehaves with concurrent downloads on either Deezer or yt-dlp; increasing concurrency is planned). Flow per track: try Deezer (if ARL configured) → fall back to yt-dlp/YouTube search + duration/keyword ranking → verify file size + duration → embed metadata/artwork via Mutagen → rename to final. Failed tracks don't abort the batch; user can retry individually or retry with a manually-supplied Deezer/YouTube URL (bypasses search entirely). Each attempt has a hard 60 s budget (`_TRACK_TIMEOUT` in `download_queue.py`; yt-dlp also uses a 15 s socket timeout and few internal retries) so one stuck track can never stall a long batch – on timeout it is re-queued behind the rest, and after 2 attempts it is marked failed. Duration mismatch / "track not found" are permanent, no auto-retry. Queue state persists in SQLite (`config/jobs.db`) and is cleared on server restart (queued items dropped, failed items retained for display). Bulk refresh-all/download-all resolve against Spotify with bounded concurrency (a semaphore), not fully sequential or fully parallel.
 
 ## Metadata & Artwork
 
@@ -127,6 +129,19 @@ If app is reinstalled, pointing at same library dir recovers state from `.spotif
 - **Storage:** `MANAGE_EXTERNAL_STORAGE` (granted via a Settings redirect in `StepPermissions`/`NotificationPermissionSetting`, not a runtime dialog) is what lets downloaded MP3s land as plain, visible files rather than sandboxed app storage — required by this project's Core Principle. The folder picker (`SafPathResolver.kt`) is only ever used to translate a `content://` tree URI into that real path; it isn't a separate access grant.
 - **Distribution:** pre-built APKs are published as GitHub Releases — most contributors never need to build the Android app themselves. Building it locally needs Android Studio + the same `backend/.venv` the desktop backend uses (`chaquopy.buildPython` points at it directly) — see the README.
 
+## Windows App
+
+`desktop/` wraps the *unmodified* `backend/app` in a native window — same rule as Android: no business logic may branch on platform, only environment/dependency resolution.
+
+- **Runtime:** `launcher.py` sets env vars, starts `uvicorn.Server` in a background thread on a fixed port (8765, falling back to 8766–8775 — fixed so the WebView's cookies/localStorage origin stays stable), then `shell.py` opens a pywebview window (WebView2) on the main thread. `--self-test` starts the server without a window, checks `/api/health`, `/api/dependencies` and `/`, then exits 0/1 — the build runs it before packaging.
+- **Platform detection is purely env vars**, set before `app.main` is imported: `SPOTISTORAGE_PLATFORM=windows`, `SPOTISTORAGE_CONFIG_DIR` (`%APPDATA%\SpotiStorage` when frozen, the repo `config/` when run from source), `SPOTISTORAGE_PORT`, and when frozen `SPOTISTORAGE_FFMPEG_DIR`/`SPOTISTORAGE_QUICKJS_PATH` pointing into the bundle. The frontend checks `config.platform === "windows"` via `useIsDesktopApp()`. Plain `npm run dev` stays `"desktop"` and shows none of the app-only UI.
+- **Native bridge:** `shell.py` exposes a pywebview `js_api` (`pick_folder`/`pick_file`, native Windows dialogs); `frontend/src/lib/desktopBridge.ts` wraps `window.pywebview.api`, and `useBrowseFolder`/`useBrowseFile` use it instead of the tkinter endpoints (which return 400 on `windows`, like on Android).
+- **Custom title bar:** the native caption is removed (`win32.remove_title_bar` strips `WS_CAPTION` but keeps `WS_THICKFRAME`, so resize edges, shadow, rounded corners and snapping stay native) and `WindowTitleBar` renders a 24 px strip above the shell with minimize/maximize/close buttons, shown only when `useIsDesktopApp()`. Buttons and window dragging call `DesktopApi.window_*` (`ShowWindow`, `WM_CLOSE` so the normal close flow runs, `ReleaseCapture`+`WM_NCLBUTTONDOWN`/`HTCAPTION` for a native drag; double-click toggles maximize). `_remove_top_frame` subclasses the window proc (ctypes) and zeroes the top non-client band in `WM_NCCALCSIZE` while not maximized, so the title bar sits flush at the window's top edge; the lost top resize zone is replaced by invisible `WindowResizeGrips` (`begin_resize` → `WM_NCLBUTTONDOWN` with `HTTOP*`). Without a caption Windows would maximize over the taskbar, so `fit_maximized_to_work_area` sets `Form.MaximizedBounds` to the monitor work area inflated by the frame thickness before every maximize.
+- **Window & zoom:** the window opens maximized. Zoom is browser-like (Ctrl +/−/0, Ctrl+wheel, Chrome's zoom steps): `zoom.py` injects a key/wheel listener that calls `pywebview.api.zoom()`, which sets WebView2's `ZoomFactor` and persists it to `{config_dir}/window.json` — WebView2's own accelerator keys are disabled by pywebview and its `ZoomFactorChanged` event doesn't reach Python, so all zoom goes through this one path.
+- **Window close:** `config.close_action` (`quit` default | `tray`, set via `PUT /api/config/close-action`, Settings → Window). Quitting while `download_queue.has_active_work()` shows a native Yes/No `MessageBoxW` (`win32.py`). In `tray` mode the window hides and a pystray icon (`tray.py`) offers Open / status / Quit, plus a Windows notification when a batch finishes while hidden. Single instance via a named mutex — a second launch focuses the existing window.
+- **Updates:** `GET /api/app/update` compares the installed version (`importlib.metadata`, bundled via `copy_metadata`) with GitHub's latest release (cached 6 h, fails quietly). The app shows it as a Settings banner (`UpdateBanner`) and a dismissible header pill (`UpdatePill`, dismissal per version in localStorage). No auto-install, no code signing.
+- **Build:** `desktop/build.ps1` (used by CI and `npm run desktop:build`) builds the frontend, syncs uv with the `desktop` dependency group, fetches a pinned FFmpeg shared build (SHA256-checked, not committed), runs PyInstaller (`spotistorage.spec`, onedir, windowed), runs the self-test, then Inno Setup (`installer.iss`, per-user install to `%LOCALAPPDATA%\Programs\SpotiStorage`, no admin). `npm run desktop` runs the shell from source without packaging. The `desktop` uv group is opt-in, so plain `uv sync` and the Android build don't pull it in.
+
 ## UI Design
 
 Dark-only. Zinc oklch palette via CSS tokens in `frontend/src/index.css` (`@theme inline` block). No hardcoded hex values in components — always reference tokens. Four semantic accents used beyond zinc:
@@ -149,18 +164,18 @@ Always reach for an existing `components/ui/` primitive (or add one via shadcn c
 
 - **Max size: 200 lines per component file, target ~100 lines.** If a component grows beyond that, extract logic into a hook in `hooks/` or split markup into a child component in the same folder.
 - **No `.tsx` files in `src/` root** except `main.tsx` and `App.tsx`. All components live in semantic subfolders:
-  - `components/layout/` — AppShell, AppSidebar, BottomNav (mobile-only nav, same `navItems.ts` as the sidebar), NavErrorBadge, DownloadBar, DownloadPanel
+  - `components/layout/` — AppShell, AppSidebar, BottomNav (mobile-only nav, same `navItems.ts` as the sidebar), NavErrorBadge, DownloadBar, DownloadPanel, UpdatePill (Windows app only)
   - `components/url/` — ResolvePreview, UserProfilePreview
   - `components/library/` — SourceList, SourceCard, LibraryHeader
   - `components/source/` — SourceHeader, CompactBar, SourceActions, TrackTable, TrackTableHeader, TrackRow, TrackStatusBadge, RefreshBanner, DeleteSourceDialog, DeleteRemovedDialog, TrackDeleteDialog, SourceBadges, `trackColumns.ts` (shared column-width classes between the header and rows)
   - `components/errors/` — ErrorRow
-  - `components/settings/` — LibraryPathSetting, DeleteLibraryDialog, SpotifyCookieSetting, DeezerArlSetting, YoutubeCookiesSetting (+ its three mode components: `YoutubeCookiesBrowserMode`/`FileMode`/`PasteMode`), SecretCookieSetting (shared by the two cookie settings), DependencyStatus, NotificationPermissionSetting (Android only)
+  - `components/settings/` — LibraryPathSetting, DeleteLibraryDialog, SpotifyCookieSetting, DeezerArlSetting, YoutubeCookiesSetting (+ its three mode components: `YoutubeCookiesBrowserMode`/`FileMode`/`PasteMode`), SecretCookieSetting (shared by the two cookie settings), DependencyStatus, NotificationPermissionSetting (Android only), CloseBehaviorSetting + UpdateBanner (Windows app only)
   - `components/setup/` — SetupWizard, StepWelcome, StepPermissions (Android only), StepFolder, StepDeps
   - `components/common/` — small cross-page building blocks: SourceArtwork, MediaCard (shared artwork+content card layout — pick ONE render position for an `actions` slot via `useIsMobile()`, never render it twice), EmptyState, SearchInput, CenteredSpinner, CircularProgress, ActionMenu (DropdownMenu on desktop / Sheet on mobile, same items list), CopyButton, PermissionStatus (Android only)
   - `components/ui/` — shadcn/ui primitives (generated output, do not hand-edit these unless adding a variant)
   - `pages/` — thin page shells (LibraryPage, SourcePage, SettingsPage, SetupPage, AddPage, ErrorsPage)
-  - `hooks/` — all custom hooks; split by concern once a hook file grows (e.g. `useSourceQueries`/`useSourceMutations`, re-exported together from `useSources` so call sites don't churn), plus flow-specific hooks like `useDeleteSourceFlow`, `useAddAndDownload`, `useTrackSortFilter`, `useSetupSteps` (which steps apply — `permissions` only on Android), `useCopyToClipboard`
-  - `lib/` — pure utilities: `utils.ts` (`cn`, `capitalize`, `pluralize`, `formatLocalTime`), `status.ts` (badge-variant + missing-track-count helpers), `toast.ts` (sonner wrappers), `androidBridge.ts` (typed wrapper over `window.AndroidBridge`, a no-op everywhere except inside the Android WebView — see "Android App" below)
+  - `hooks/` — all custom hooks; split by concern once a hook file grows (e.g. `useSourceQueries`/`useSourceMutations`, re-exported together from `useSources` so call sites don't churn), plus flow-specific hooks like `useDeleteSourceFlow`, `useAddAndDownload`, `useTrackSortFilter`, `useSetupSteps` (which steps apply — `permissions` only on Android), `useCopyToClipboard`, `useIsDesktopApp`, `useAppUpdate`
+  - `lib/` — pure utilities: `utils.ts` (`cn`, `capitalize`, `pluralize`, `formatLocalTime`), `status.ts` (badge-variant + missing-track-count helpers), `toast.ts` (sonner wrappers), `androidBridge.ts` (typed wrapper over `window.AndroidBridge`, a no-op everywhere except inside the Android WebView — see "Android App" below), `desktopBridge.ts` (same idea for `window.pywebview.api` in the Windows app)
 
 ## Filesystem Safety
 
@@ -175,7 +190,9 @@ Support 300+ track playlists as normal case. No hard-coded limits. Use paginatio
 ```
 GET/PUT  /api/config
 PUT      /api/config/complete-setup, /api/config/sp-dc, /api/config/youtube-cookies, /api/config/deezer-arl
-GET      /api/config/browse-folder, /api/config/browse-file (desktop only — 400 on Android)
+PUT      /api/config/close-action
+GET      /api/config/browse-folder, /api/config/browse-file (dev desktop only — 400 on Android and the Windows app)
+GET      /api/app/update
 GET/POST /api/libraries, DELETE /api/libraries/{id}
 POST     /api/sources/resolve, POST /api/sources
 GET      /api/sources, /api/sources/{id}
@@ -209,6 +226,8 @@ GET      /api/dependencies, /api/health
 
 ## Git Commits
 
+**Never commit, push, merge, tag or rewrite history unless the user explicitly asks – this rule has no exceptions.** When asked to commit, make exactly ONE commit per feature branch with everything in it; never split work into several commits on your own initiative (ask first if you think it should be split).
+
 Only `feat:` or `fix:` prefix. English, ~10 words max, no AI attribution.
 ```
 feat: add playlist synchronization
@@ -217,7 +236,7 @@ fix: prevent duplicate downloads
 
 ## Release Notes
 
-Each release has a notes file at `.github/release-notes/v{version}.md` (the Android release workflow publishes it as the GitHub Release body). Bump the version in the same change: `package.json`, `frontend/package.json`, both `package-lock.json` files, `backend/pyproject.toml`, `backend/uv.lock`, and `android/app/build.gradle.kts` (`versionName` + increment `versionCode`).
+Each release has a notes file at `.github/release-notes/v{version}.md` (the release workflow, `.github/workflows/release.yml`, builds the APK and the Windows installer and publishes both under one GitHub Release with this file as the body). Bump the version in the same change: `package.json`, `frontend/package.json`, both `package-lock.json` files, `backend/pyproject.toml`, `backend/uv.lock`, and `android/app/build.gradle.kts` (`versionName` + increment `versionCode`).
 
 Rules: English, no title/heading line – start straight with a bold section label, then a short bullet list. One line per change, user-facing wording (what changed for the user, not how), no implementation details or file names. Keep it brief – a small release can be 1–3 bullets. Use only the sections that apply, in this order: `**Features**`, `**Fixes & improvements**`. En-dash (–), not em-dash.
 

@@ -9,9 +9,13 @@ import {
 import { AppSidebar } from "./AppSidebar";
 import { DownloadBar } from "./DownloadBar";
 import { BottomNav } from "./BottomNav";
+import { UpdatePill } from "./UpdatePill";
+import { WindowTitleBar } from "./WindowTitleBar";
 import { useDownloadNotifications } from "@/hooks/useDownloadNotifications";
 import { useSource } from "@/hooks/useSources";
 import { useIsMobile } from "@/hooks/useIsMobile";
+import { useIsDesktopApp } from "@/hooks/useIsDesktopApp";
+import { cn } from "@/lib/utils";
 
 const STATIC_TITLES: Record<string, string> = {
   "/library": "Library",
@@ -60,37 +64,44 @@ function AppBreadcrumbs() {
 export function AppShell() {
   const { lastBatch, clearLastBatch } = useDownloadNotifications();
   const isMobile = useIsMobile();
+  const isDesktopApp = useIsDesktopApp();
 
-  return (
-    <SidebarProvider className="h-svh! min-h-0! overflow-hidden" style={{ "--sidebar-width": "188px" } as CSSProperties}>
+  const shell = (
+    <SidebarProvider
+      className={cn("min-h-0! overflow-hidden", isDesktopApp ? "h-full!" : "h-svh!")}
+      style={{ "--sidebar-width": "188px" } as CSSProperties}
+    >
       <AppSidebar />
-      <SidebarInset className="flex flex-col min-h-0 overflow-hidden">
+      <SidebarInset className={cn("flex flex-col min-h-0 overflow-hidden", isDesktopApp && "peer-data-[variant=inset]:min-h-0 md:peer-data-[variant=inset]:mt-0")}>
         <header className="max-md:hidden flex h-12 shrink-0 items-center gap-2 px-4 border-b border-border/50">
           {!isMobile && <SidebarTrigger className="-ml-1" />}
           <AppBreadcrumbs />
-          {lastBatch && (
-            <div className="ml-auto flex items-center gap-1.5 rounded-full border border-border/50 bg-muted/50 px-2.5 py-1 text-xs shrink-0">
-              {lastBatch.failed > 0 || lastBatch.cancelled > 0 ? (
-                <AlertCircle className="size-3 text-amber-400 shrink-0" />
-              ) : (
-                <CheckCircle2 className="size-3 text-emerald-400 shrink-0" />
-              )}
-              <span className="text-muted-foreground tabular-nums">
-                {lastBatch.done > 0 && `${lastBatch.done} downloaded`}
-                {lastBatch.done > 0 && (lastBatch.failed > 0 || lastBatch.cancelled > 0) && " - "}
-                {lastBatch.failed > 0 && `${lastBatch.failed} failed`}
-                {lastBatch.failed > 0 && lastBatch.cancelled > 0 && " - "}
-                {lastBatch.cancelled > 0 && `${lastBatch.cancelled} cancelled`}
-              </span>
-              <button
-                className="text-muted-foreground hover:text-foreground transition-colors ml-0.5"
-                onClick={clearLastBatch}
-                aria-label="Dismiss download summary"
-              >
-                <X className="size-3" />
-              </button>
-            </div>
-          )}
+          <div className="ml-auto flex items-center gap-2">
+            <UpdatePill />
+            {lastBatch && (
+              <div className="flex items-center gap-1.5 rounded-full border border-border/50 bg-muted/50 px-2.5 py-1 text-xs shrink-0">
+                {lastBatch.failed > 0 || lastBatch.cancelled > 0 ? (
+                  <AlertCircle className="size-3 text-amber-400 shrink-0" />
+                ) : (
+                  <CheckCircle2 className="size-3 text-emerald-400 shrink-0" />
+                )}
+                <span className="text-muted-foreground tabular-nums">
+                  {lastBatch.done > 0 && `${lastBatch.done} downloaded`}
+                  {lastBatch.done > 0 && (lastBatch.failed > 0 || lastBatch.cancelled > 0) && " - "}
+                  {lastBatch.failed > 0 && `${lastBatch.failed} failed`}
+                  {lastBatch.failed > 0 && lastBatch.cancelled > 0 && " - "}
+                  {lastBatch.cancelled > 0 && `${lastBatch.cancelled} cancelled`}
+                </span>
+                <button
+                  className="text-muted-foreground hover:text-foreground transition-colors ml-0.5"
+                  onClick={clearLastBatch}
+                  aria-label="Dismiss download summary"
+                >
+                  <X className="size-3" />
+                </button>
+              </div>
+            )}
+          </div>
         </header>
         <div
           data-scroll-root
@@ -104,5 +115,14 @@ export function AppShell() {
         {isMobile && <BottomNav />}
       </SidebarInset>
     </SidebarProvider>
+  );
+
+  if (!isDesktopApp) return shell;
+
+  return (
+    <div className="flex h-svh flex-col bg-sidebar">
+      <WindowTitleBar />
+      <div className="relative min-h-0 flex-1 overflow-hidden [transform:translateZ(0)]">{shell}</div>
+    </div>
   );
 }

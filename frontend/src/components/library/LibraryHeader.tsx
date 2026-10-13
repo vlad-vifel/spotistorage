@@ -10,7 +10,7 @@ import { cn } from "@/lib/utils";
 import type { Source } from "@/api/types";
 
 export function LibraryHeader({ sources }: { sources: Source[] }) {
-  const { active } = useDownloads();
+  const { active, summary } = useDownloads();
   const refreshAll = useRefreshAllSources();
   const downloadAll = useDownloadAllMissing();
   const deleteRemoved = useDeleteAllRemovedTracks();
@@ -21,7 +21,7 @@ export function LibraryHeader({ sources }: { sources: Source[] }) {
   const removedTracks = sources.reduce((sum, s) => sum + getRemovedCount(s), 0);
   const notDownloaded = totalTracks - downloadedTracks;
   const badgeVariant = sources.length > 0 ? getSourceBadgeVariant(downloadedTracks, totalTracks) : "outline";
-  const isDownloading = active.length > 0 || downloadAll.isPending;
+  const isDownloading = downloadAll.isPending || !!summary?.active || active.length > 0;
 
   return (
     <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
@@ -50,10 +50,11 @@ export function LibraryHeader({ sources }: { sources: Source[] }) {
             onClick={() => downloadAll.mutate()}
             disabled={isDownloading || notDownloaded === 0}
           >
-            {downloadAll.isPending
-              ? <Loader2 className="size-3.5 animate-spin" />
-              : <Download className="size-3.5" />}
-            Download{notDownloaded > 0 ? ` (${notDownloaded})` : ""}
+            {isDownloading ? (
+              <><Loader2 className="size-3.5 animate-spin" /> Downloading</>
+            ) : (
+              <><Download className="size-3.5" /> Download{notDownloaded > 0 ? ` (${notDownloaded})` : ""}</>
+            )}
           </Button>
           {removedTracks > 0 && (
             <Button

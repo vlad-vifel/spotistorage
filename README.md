@@ -6,10 +6,26 @@
 
 <p align="center">
   A local-only Spotify downloader: paste a URL, get real MP3 files with metadata, organized into folders.<br>
-  Runs as a desktop web app or an Android app – no streaming, no cloud, no lock-in.
+  Runs as a Windows app, an Android app or from source – no streaming, no cloud, no lock-in.
 </p>
 
-## Desktop
+## Windows App
+
+Download `SpotiStorage-Setup-vX.Y.Z.exe` from the [Releases](../../releases) page and run it. It installs for your user only (no admin rights), adds a Start menu shortcut and bundles everything it needs – FFmpeg, the JS runtime and Python are inside, nothing to install separately.
+
+The installer isn't code-signed, so Windows SmartScreen may show "Windows protected your PC" on first run – click **More info → Run anyway**.
+
+- Settings, the download queue and logs live in `%APPDATA%\SpotiStorage` (logs in `logs\app.log`). Uninstalling keeps this folder and never touches your music library.
+- Closing the window quits the app by default (with a confirmation if downloads are running). Switch to "Minimize to tray" in Settings → Window to keep downloads going in the background.
+- When a newer release is out, Settings and the header show an "Update available" link to it.
+
+To build the app yourself:
+```
+npm run desktop          # run the desktop shell from source (window + tray, no packaging)
+npm run desktop:build    # build the .exe and installer into desktop/dist/ (needs Inno Setup 6)
+```
+
+## Run from Source
 
 ### Prerequisites
 
@@ -56,7 +72,7 @@ npm run lint --prefix frontend
 uv run --directory backend python -m unittest discover -s tests
 ```
 
-Pull requests run the same frontend checks, backend tests and Android debug build in GitHub Actions.
+Pull requests run the same frontend checks, backend tests, Android debug build and a packaged Windows build (with a startup self-test) in GitHub Actions. Pushing a `v*` tag builds the signed APK and the Windows installer and attaches both to one GitHub Release.
 
 Signed release APKs use the repository Actions secrets `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS` and `ANDROID_KEY_PASSWORD`. The keystore itself must never be committed to the repository.
 

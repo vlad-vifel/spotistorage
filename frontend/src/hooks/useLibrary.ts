@@ -4,6 +4,7 @@ import { useUpdateConfig, useCreateLibrary as _useCreateLibrary } from "./useCon
 import { configApi } from "@/api/config";
 import { showSuccess, showError } from "@/lib/toast";
 import type { AppConfig } from "@/api/types";
+import { isDesktopApp, pickFile, pickFolder } from "@/lib/desktopBridge";
 
 export { _useCreateLibrary as useCreateLibrary };
 
@@ -48,7 +49,7 @@ export function useBrowseFolder() {
   async function browse(setPath: (path: string) => void) {
     setIsBrowsing(true);
     try {
-      const { path } = await configApi.browseFolder();
+      const path = isDesktopApp() ? await pickFolder() : (await configApi.browseFolder()).path;
       if (path) setPath(path);
     } catch (e) {
       showError(e, "Could not open folder picker");
@@ -66,7 +67,7 @@ export function useBrowseFile() {
   async function browse(setPath: (path: string) => void) {
     setIsBrowsing(true);
     try {
-      const { path } = await configApi.browseFile();
+      const path = isDesktopApp() ? await pickFile() : (await configApi.browseFile()).path;
       if (path) setPath(path);
     } catch (e) {
       showError(e, "Could not open file picker");

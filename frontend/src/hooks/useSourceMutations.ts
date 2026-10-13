@@ -46,10 +46,12 @@ export function useDownloadSource() {
       if (ctx?.prevSource) qc.setQueryData(["source", ctx.sourceId], ctx.prevSource);
     },
     onSettled: (_, __, sourceId) => {
-      qc.invalidateQueries({ queryKey: ["downloads"] });
-      qc.invalidateQueries({ queryKey: ["download-summary"] });
       qc.invalidateQueries({ queryKey: ["sources"] });
       qc.invalidateQueries({ queryKey: ["source", sourceId] });
+      return Promise.all([
+        qc.invalidateQueries({ queryKey: ["downloads"] }),
+        qc.invalidateQueries({ queryKey: ["download-summary"] }),
+      ]);
     },
   });
 }
@@ -116,9 +118,11 @@ export function useDownloadAllMissing() {
       if (result.preparing) showSuccess(`Preparing ${pluralize(result.total ?? 0, "track")}`);
       else if (result.queued === 0) showInfo("Everything is already downloaded");
       else showSuccess(`Queued ${pluralize(result.queued, "track")}`);
-      qc.invalidateQueries({ queryKey: ["downloads"] });
-      qc.invalidateQueries({ queryKey: ["download-summary"] });
       qc.invalidateQueries({ queryKey: ["sources"] });
+      return Promise.all([
+        qc.invalidateQueries({ queryKey: ["downloads"] }),
+        qc.invalidateQueries({ queryKey: ["download-summary"] }),
+      ]);
     },
     onError: (e) => showError(e, "Download all failed"),
   });

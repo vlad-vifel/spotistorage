@@ -15,7 +15,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import FileResponse, JSONResponse
 from contextlib import asynccontextmanager
-from app.api import config, libraries, sources, downloads, dependencies
+from app.api import app_info, config, libraries, sources, downloads, dependencies
 from app.services.config_store import load_config
 from app.services.download_queue import download_queue
 from app.services.library_scan import scan_library
@@ -103,6 +103,7 @@ app.include_router(libraries.router)
 app.include_router(sources.router)
 app.include_router(downloads.router)
 app.include_router(dependencies.router)
+app.include_router(app_info.router)
 
 
 @app.get("/api/health")

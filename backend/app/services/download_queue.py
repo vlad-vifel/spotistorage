@@ -1,6 +1,7 @@
 import asyncio
 import json
 import os
+import time
 import uuid
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -15,10 +16,16 @@ from app.services.filenames import standalone_filename, track_filename
 from app.services.state_store import load_state, save_state
 
 _CONCURRENCY = 1
-_MAX_AUTO_RETRIES = 3
+_MAX_AUTO_RETRIES = 2
+_TRACK_TIMEOUT = 60.0
+_TIMEOUT_GRACE = 15.0
 _DELAY_BETWEEN_DOWNLOADS = 1.0
 _BACKOFF_BASE = 2.0
 _BACKOFF_MAX = 60.0
+
+
+class _TrackTimeout(RuntimeError):
+    pass
 
 
 @dataclass
@@ -182,11 +189,10 @@ class DownloadQueue:
         queued = sum(status == JobStatus.queued for status in statuses)
         total = max(batch.planned_total, len(batch.job_ids))
         active = not batch.cancelled and (batch.preparing or queued > 0 or bool(active_jobs))
-        progress = (done + sum(job.progress for job in active_jobs)) / total if total else 0.0
         return DownloadSummary(
             batch_id=batch.id, active=active, preparing=batch.preparing, total=total,
             done=done, failed=failed, cancelled=cancelled,
-            percent=max(0.0, min(progress, 1.0)),
+            percent=min(done / total, 1.0) if total else 0.0,
             current_track=active_jobs[0].track_title if active_jobs else None,
         )
 
@@ -302,21 +308,30 @@ class DownloadQueue:
             final_name = track_filename(position, artists, track["title"]) if source_type in ("playlist", "album") else standalone_filename(artists, track["title"])
             final_path = folder / final_name
             cfg = load_config()
+            deadline = time.monotonic() + _TRACK_TIMEOUT
             kwargs = {
                 "youtube_cookies_path": cfg.youtube_cookies_path,
                 "youtube_browser": cfg.youtube_browser,
                 "deezer_arl": cfg.deezer_arl,
-                "should_cancel": lambda: job.id in self._cancelled,
+                "should_cancel": lambda: job.id in self._cancelled or time.monotonic() > deadline,
             }
             duration_ms = track.get("duration_ms")
             if job.id in self._manual_urls:
-                downloaded, dl_info = await audio_engine.download_from_url(self._manual_urls[job.id], folder, **kwargs)
+                download = audio_engine.download_from_url(self._manual_urls[job.id], folder, **kwargs)
             else:
-                downloaded, dl_info = await audio_engine.download_track(
+                download = audio_engine.download_track(
                     job.track_id, folder, artist=", ".join(artists), title=track["title"],
                     expected_duration_s=duration_ms / 1000 if duration_ms else None,
                     on_progress=lambda progress: setattr(job, "progress", progress), **kwargs,
                 )
+            try:
+                downloaded, dl_info = await asyncio.wait_for(download, _TRACK_TIMEOUT + _TIMEOUT_GRACE)
+            except asyncio.TimeoutError:
+                raise _TrackTimeout(f"Timed out after {int(_TRACK_TIMEOUT)}s") from None
+            except audio_engine.DownloadCancelled:
+                if job.id in self._cancelled:
+                    raise
+                raise _TrackTimeout(f"Timed out after {int(_TRACK_TIMEOUT)}s") from None
             if not downloaded.exists() or downloaded.stat().st_size < 4096:
                 raise RuntimeError("Downloaded file is empty or missing")
             if job.id in self._cancelled:
